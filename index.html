@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Price Alert | Search It. Compare It. Save.</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f5f7fa;
+      color: #172033;
+    }
+
+    header {
+      background: white;
+      padding: 20px 7%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #e1e5ea;
+    }
+
+    .logo {
+      font-size: 30px;
+      font-weight: 800;
+    }
+
+    .logo span {
+      color: #1769e0;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: #172033;
+      margin-left: 25px;
+      font-weight: 600;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 90px 20px 70px;
+    }
+
+    .hero h1 {
+      font-size: 55px;
+      margin-bottom: 15px;
+    }
+
+    .hero h1 span {
+      color: #1769e0;
+    }
+
+    .hero p {
+      font-size: 21px;
+      color: #667085;
+      margin-bottom: 35px;
+    }
+
+    .search {
+      max-width: 800px;
+      margin: auto;
+      display: flex;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,.10);
+    }
+
+    .search input {
+      flex: 1;
+      border: none;
+      padding: 20px;
+      font-size: 18px;
+      outline: none;
+    }
+
+    .search button {
+      border: none;
+      background: #1769e0;
+      color: white;
+      padding: 0 30px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .categories {
+      max-width: 1100px;
+      margin: auto;
+      padding: 30px 20px 70px;
+    }
+
+    .categories h2 {
+      text-align: center;
+      font-size: 30px;
+      margin-bottom: 30px;
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(4,1fr);
+      gap: 18px;
+    }
+
+    .category {
+      background: white;
+      padding: 28px 15px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 17px;
+      font-weight: bold;
+      border: 1px solid #e1e5ea;
+    }
+
+    .how {
+      background: white;
+      padding: 65px 20px;
+    }
+
+    .how h2 {
+      text-align: center;
+      font-size: 30px;
+      margin-bottom: 35px;
+    }
+
+    .steps {
+      max-width: 950px;
+      margin: auto;
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 25px;
+    }
+
+    .step {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .number {
+      width: 48px;
+      height: 48px;
+      margin: auto auto 15px;
+      border-radius: 50%;
+      background: #1769e0;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 21px;
+      font-weight: bold;
+    }
+
+    .step h3 {
+      margin-bottom: 10px;
+    }
+
+    .step p {
+      color: #667085;
+      line-height: 1.5;
+    }
+
+    .disclosure {
+      max-width: 900px;
+      margin: 45px auto 0;
+      padding: 18px;
+      background: #eef5ff;
+      border-radius: 10px;
+      color: #44546a;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    footer {
+      text-align: center;
+      padding: 30px;
+      color: #667085;
+      font-size: 14px;
+    }
+
+    @media (max-width: 750px) {
+
+      nav {
+        display: none;
+      }
+
+      .hero h1 {
+        font-size: 40px;
+      }
+
+      .search {
+        flex-direction: column;
+      }
+
+      .search button {
+        padding: 17px;
+      }
+
+      .category-grid {
+        grid-template-columns: repeat(2,1fr);
+      }
+
+      .steps {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+
+  <div class="logo">
+    PRICE <span>ALERT</span>
+  </div>
+
+  <nav>
+    <a href="#categories">Categories</a>
+    <a href="#how">How It Works</a>
+  </nav>
+
+</header>
+
+
+<section class="hero">
+
+  <h1>
+    Search it. Compare it. <span>Save.</span>
+  </h1>
+
+  <p>
+    Find the product you want and compare your buying options in one place.
+  </p>
+
+  <div class="search">
+
+    <input
+      type="search"
+      placeholder="Search product name, model #, item #, UPC..."
+    >
+
+    <button onclick="alert('Product search is coming soon!')">
+      Search
+    </button>
+
+  </div>
+
+</section>
+
+
+<section class="categories" id="categories">
+
+  <h2>Popular Categories</h2>
+
+  <div class="category-grid">
+
+    <div class="category">Tools</div>
+
+    <div class="category">Electronics</div>
+
+    <div class="category">Home Improvement</div>
+
+    <div class="category">Automotive</div>
+
+    <div class="category">Appliances</div>
+
+    <div class="category">Computers</div>
+
+    <div class="category">Gaming</div>
+
+    <div class="category">Outdoor</div>
+
+  </div>
+
+</section>
+
+
+<section class="how" id="how">
+
+  <h2>How Price Alert Works</h2>
+
+  <div class="steps">
+
+    <div class="step">
+
+      <div class="number">1</div>
+
+      <h3>Search</h3>
+
+      <p>
+        Search for a product by name, model number,
+        item number or UPC.
+      </p>
+
+    </div>
+
+
+    <div class="step">
+
+      <div class="number">2</div>
+
+      <h3>Compare</h3>
+
+      <p>
+        Compare buying options from different
+        retailers in one simple place.
+      </p>
+
+    </div>
+
+
+    <div class="step">
+
+      <div class="number">3</div>
+
+      <h3>Save</h3>
+
+      <p>
+        Choose the buying option that works best
+        for you and go directly to the retailer.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="disclosure">
+
+    <strong>Affiliate Disclosure:</strong>
+
+    Price Alert may earn a commission when you purchase
+    through certain links on our site. This does not
+    increase the price you pay.
+
+  </div>
+
+</section>
+
+
+<footer>
+
+  © 2026 Price Alert • Early Development Version
+
+</footer>
+
+
+</body>
+</html>
