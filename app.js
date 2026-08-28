@@ -38,7 +38,7 @@ function loadSaved() {
 function persistSaved() {
   try { localStorage.setItem("priceAlertShoppingList", JSON.stringify(state.saved)); } catch {}
 }
-function productVisual(product) { return `<div class="product-visual" data-category="${escapeHtml(product.category)}" aria-label="Visual placeholder for ${escapeHtml(product.name)}">${escapeHtml(product.mark)}</div>`; }
+function productVisual(product) { return `<div class="product-visual" data-category="${escapeHtml(product.category)}" role="img" aria-label="Sample visual placeholder for ${escapeHtml(product.name)}">${escapeHtml(product.mark)}</div>`; }
 function savedClass(id) { return state.saved.includes(id) ? " saved" : ""; }
 function savedLabel(id) { return state.saved.includes(id) ? "Remove from shopping list" : "Save to shopping list"; }
 

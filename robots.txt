@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /price-alert/
+
+Sitemap: https://general-xxx.github.io/price-alert/sitemap.xml
