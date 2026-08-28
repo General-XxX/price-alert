@@ -92,6 +92,92 @@
       cursor: pointer;
     }
 
+    .results {
+      max-width: 1100px;
+      margin: auto;
+      padding: 0 20px 70px;
+    }
+
+    .results h2 {
+      text-align: center;
+      font-size: 30px;
+      margin-bottom: 30px;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .product-card {
+      background: white;
+      padding: 24px;
+      border: 1px solid #e1e5ea;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 6px 20px rgba(0,0,0,.06);
+    }
+
+    .product-card h3 {
+      font-size: 20px;
+      line-height: 1.35;
+      margin-bottom: 8px;
+    }
+
+    .retailer {
+      color: #667085;
+      margin-bottom: 22px;
+    }
+
+    .product-details {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .price {
+      color: #1769e0;
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .availability {
+      color: #217a43;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .deal-button {
+      display: block;
+      padding: 13px 20px;
+      border-radius: 8px;
+      background: #1769e0;
+      color: white;
+      text-align: center;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .product-card[hidden],
+    .no-results[hidden] {
+      display: none;
+    }
+
+    .no-results {
+      padding: 30px 20px;
+      border: 1px solid #d9e6f8;
+      border-radius: 12px;
+      background: #eef5ff;
+      color: #44546a;
+      text-align: center;
+      font-size: 17px;
+    }
+
     .categories {
       max-width: 1100px;
       margin: auto;
@@ -203,6 +289,10 @@
         padding: 17px;
       }
 
+      .results-grid {
+        grid-template-columns: 1fr;
+      }
+
       .category-grid {
         grid-template-columns: repeat(2,1fr);
       }
@@ -241,18 +331,66 @@
     Find the product you want and compare your buying options in one place.
   </p>
 
-  <div class="search">
+  <form class="search" id="product-search">
 
     <input
+      id="search-input"
       type="search"
       placeholder="Search product name, model #, item #, UPC..."
+      aria-label="Search products"
     >
 
-    <button onclick="alert('Product search is coming soon!')">
+    <button type="submit">
       Search
     </button>
 
+  </form>
+
+</section>
+
+
+<section class="results" id="search-results" aria-labelledby="results-heading" hidden>
+
+  <h2 id="results-heading">Search Results</h2>
+
+  <!-- Sample products are for development purposes only. -->
+  <div class="results-grid" id="results-grid">
+
+    <article class="product-card">
+      <h3>DeWalt 20V MAX Cordless Drill Kit</h3>
+      <p class="retailer">Home Depot</p>
+      <div class="product-details">
+        <span class="price">$99.00</span>
+        <span class="availability">In Stock</span>
+      </div>
+      <a class="deal-button" href="#">View Deal</a>
+    </article>
+
+    <article class="product-card">
+      <h3>Apple AirPods Pro (2nd Generation)</h3>
+      <p class="retailer">Best Buy</p>
+      <div class="product-details">
+        <span class="price">$189.99</span>
+        <span class="availability">Available</span>
+      </div>
+      <a class="deal-button" href="#">View Deal</a>
+    </article>
+
+    <article class="product-card">
+      <h3>Samsung 55&quot; 4K Smart TV</h3>
+      <p class="retailer">Walmart</p>
+      <div class="product-details">
+        <span class="price">$348.00</span>
+        <span class="availability">In Stock</span>
+      </div>
+      <a class="deal-button" href="#">View Deal</a>
+    </article>
+
   </div>
+
+  <p class="no-results" id="no-results" role="status" hidden>
+    No matching products found yet.
+  </p>
 
 </section>
 
@@ -352,6 +490,40 @@
   © 2026 Price Alert • Early Development Version
 
 </footer>
+
+
+<script>
+  const searchForm = document.getElementById('product-search');
+  const searchInput = document.getElementById('search-input');
+  const searchResults = document.getElementById('search-results');
+  const productCards = Array.from(document.querySelectorAll('.product-card'));
+  const noResults = document.getElementById('no-results');
+
+  searchForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+
+    const searchText = searchInput.value.trim().toLowerCase();
+
+    if (!searchText) {
+      searchResults.hidden = true;
+      return;
+    }
+
+    let matchCount = 0;
+
+    productCards.forEach(function (card) {
+      const isMatch = card.textContent.toLowerCase().includes(searchText);
+      card.hidden = !isMatch;
+
+      if (isMatch) {
+        matchCount += 1;
+      }
+    });
+
+    noResults.hidden = matchCount !== 0;
+    searchResults.hidden = false;
+  });
+</script>
 
 
 </body>
