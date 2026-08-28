@@ -3,528 +3,114 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  <meta name="description" content="Compare sample product offers and plan purchases with Price Alert.">
   <title>Price Alert | Search It. Compare It. Save.</title>
-
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      background: #f5f7fa;
-      color: #172033;
-    }
-
-    header {
-      background: white;
-      padding: 20px 7%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid #e1e5ea;
-    }
-
-    .logo {
-      font-size: 30px;
-      font-weight: 800;
-    }
-
-    .logo span {
-      color: #1769e0;
-    }
-
-    nav a {
-      text-decoration: none;
-      color: #172033;
-      margin-left: 25px;
-      font-weight: 600;
-    }
-
-    .hero {
-      text-align: center;
-      padding: 90px 20px 70px;
-    }
-
-    .hero h1 {
-      font-size: 55px;
-      margin-bottom: 15px;
-    }
-
-    .hero h1 span {
-      color: #1769e0;
-    }
-
-    .hero p {
-      font-size: 21px;
-      color: #667085;
-      margin-bottom: 35px;
-    }
-
-    .search {
-      max-width: 800px;
-      margin: auto;
-      display: flex;
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 8px 30px rgba(0,0,0,.10);
-    }
-
-    .search input {
-      flex: 1;
-      border: none;
-      padding: 20px;
-      font-size: 18px;
-      outline: none;
-    }
-
-    .search button {
-      border: none;
-      background: #1769e0;
-      color: white;
-      padding: 0 30px;
-      font-size: 18px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .results {
-      max-width: 1100px;
-      margin: auto;
-      padding: 0 20px 70px;
-    }
-
-    .results h2 {
-      text-align: center;
-      font-size: 30px;
-      margin-bottom: 30px;
-    }
-
-    .results-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-    }
-
-    .product-card {
-      background: white;
-      padding: 24px;
-      border: 1px solid #e1e5ea;
-      border-radius: 12px;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 6px 20px rgba(0,0,0,.06);
-    }
-
-    .product-card h3 {
-      font-size: 20px;
-      line-height: 1.35;
-      margin-bottom: 8px;
-    }
-
-    .retailer {
-      color: #667085;
-      margin-bottom: 22px;
-    }
-
-    .product-details {
-      margin-top: auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .price {
-      color: #1769e0;
-      font-size: 26px;
-      font-weight: 800;
-    }
-
-    .availability {
-      color: #217a43;
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    .deal-button {
-      display: block;
-      padding: 13px 20px;
-      border-radius: 8px;
-      background: #1769e0;
-      color: white;
-      text-align: center;
-      text-decoration: none;
-      font-weight: bold;
-    }
-
-    .product-card[hidden],
-    .no-results[hidden] {
-      display: none;
-    }
-
-    .no-results {
-      padding: 30px 20px;
-      border: 1px solid #d9e6f8;
-      border-radius: 12px;
-      background: #eef5ff;
-      color: #44546a;
-      text-align: center;
-      font-size: 17px;
-    }
-
-    .categories {
-      max-width: 1100px;
-      margin: auto;
-      padding: 30px 20px 70px;
-    }
-
-    .categories h2 {
-      text-align: center;
-      font-size: 30px;
-      margin-bottom: 30px;
-    }
-
-    .category-grid {
-      display: grid;
-      grid-template-columns: repeat(4,1fr);
-      gap: 18px;
-    }
-
-    .category {
-      background: white;
-      padding: 28px 15px;
-      border-radius: 12px;
-      text-align: center;
-      font-size: 17px;
-      font-weight: bold;
-      border: 1px solid #e1e5ea;
-    }
-
-    .how {
-      background: white;
-      padding: 65px 20px;
-    }
-
-    .how h2 {
-      text-align: center;
-      font-size: 30px;
-      margin-bottom: 35px;
-    }
-
-    .steps {
-      max-width: 950px;
-      margin: auto;
-      display: grid;
-      grid-template-columns: repeat(3,1fr);
-      gap: 25px;
-    }
-
-    .step {
-      text-align: center;
-      padding: 20px;
-    }
-
-    .number {
-      width: 48px;
-      height: 48px;
-      margin: auto auto 15px;
-      border-radius: 50%;
-      background: #1769e0;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 21px;
-      font-weight: bold;
-    }
-
-    .step h3 {
-      margin-bottom: 10px;
-    }
-
-    .step p {
-      color: #667085;
-      line-height: 1.5;
-    }
-
-    .disclosure {
-      max-width: 900px;
-      margin: 45px auto 0;
-      padding: 18px;
-      background: #eef5ff;
-      border-radius: 10px;
-      color: #44546a;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    footer {
-      text-align: center;
-      padding: 30px;
-      color: #667085;
-      font-size: 14px;
-    }
-
-    @media (max-width: 750px) {
-
-      nav {
-        display: none;
-      }
-
-      .hero h1 {
-        font-size: 40px;
-      }
-
-      .search {
-        flex-direction: column;
-      }
-
-      .search button {
-        padding: 17px;
-      }
-
-      .results-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .category-grid {
-        grid-template-columns: repeat(2,1fr);
-      }
-
-      .steps {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-<!-- Codex write access verified -->
-
-<header>
-
-  <div class="logo">
-    PRICE <span>ALERT</span>
-  </div>
-
-  <nav>
-    <a href="#categories">Categories</a>
-    <a href="#how">How It Works</a>
-  </nav>
-
-</header>
-
-
-<section class="hero">
-
-  <h1>
-    Search it. Compare it. <span>Save.</span>
-  </h1>
-
-  <p>
-    Find the product you want and compare your buying options in one place.
-  </p>
-
-  <form class="search" id="product-search">
-
-    <input
-      id="search-input"
-      type="search"
-      placeholder="Search product name, model #, item #, UPC..."
-      aria-label="Search products"
-    >
-
-    <button type="submit">
-      Search
-    </button>
-
-  </form>
-
-</section>
-
-
-<section class="results" id="search-results" aria-labelledby="results-heading" hidden>
-
-  <h2 id="results-heading">Search Results</h2>
-
-  <!-- Sample products are for development purposes only. -->
-  <div class="results-grid" id="results-grid">
-
-    <article class="product-card">
-      <h3>DeWalt 20V MAX Cordless Drill Kit</h3>
-      <p class="retailer">Home Depot</p>
-      <div class="product-details">
-        <span class="price">$99.00</span>
-        <span class="availability">In Stock</span>
-      </div>
-      <a class="deal-button" href="#">View Deal</a>
-    </article>
-
-    <article class="product-card">
-      <h3>Apple AirPods Pro (2nd Generation)</h3>
-      <p class="retailer">Best Buy</p>
-      <div class="product-details">
-        <span class="price">$189.99</span>
-        <span class="availability">Available</span>
-      </div>
-      <a class="deal-button" href="#">View Deal</a>
-    </article>
-
-    <article class="product-card">
-      <h3>Samsung 55&quot; 4K Smart TV</h3>
-      <p class="retailer">Walmart</p>
-      <div class="product-details">
-        <span class="price">$348.00</span>
-        <span class="availability">In Stock</span>
-      </div>
-      <a class="deal-button" href="#">View Deal</a>
-    </article>
-
-  </div>
-
-  <p class="no-results" id="no-results" role="status" hidden>
-    No matching products found yet.
-  </p>
-
-</section>
-
-
-<section class="categories" id="categories">
-
-  <h2>Popular Categories</h2>
-
-  <div class="category-grid">
-
-    <div class="category">Tools</div>
-
-    <div class="category">Electronics</div>
-
-    <div class="category">Home Improvement</div>
-
-    <div class="category">Automotive</div>
-
-    <div class="category">Appliances</div>
-
-    <div class="category">Computers</div>
-
-    <div class="category">Gaming</div>
-
-    <div class="category">Outdoor</div>
-
-  </div>
-
-</section>
-
-
-<section class="how" id="how">
-
-  <h2>How Price Alert Works</h2>
-
-  <div class="steps">
-
-    <div class="step">
-
-      <div class="number">1</div>
-
-      <h3>Search</h3>
-
-      <p>
-        Search for a product by name, model number,
-        item number or UPC.
-      </p>
-
+  <!-- Codex write access verified -->
+  <div class="demo-banner" role="note">Development preview — products, prices, availability, and links are sample data only.</div>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="logo" href="#top" aria-label="Price Alert home">PRICE <span>ALERT</span></a>
+      <button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav"><span class="sr-only">Toggle navigation</span><span></span><span></span><span></span></button>
+      <nav class="main-nav" id="main-nav" aria-label="Main navigation">
+        <a href="#categories">Categories</a><a href="#deals">Today's Deals</a><a href="#how">How It Works</a>
+        <a class="nav-list-link" href="#shopping-list">Shopping List <span id="nav-list-count">0</span></a>
+      </nav>
     </div>
+  </header>
 
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="shell hero-inner">
+        <p class="eyebrow">A clearer way to compare</p>
+        <h1 id="hero-title">Search it. Compare it. <span>Save.</span></h1>
+        <p class="hero-copy">Find the product you want and compare your buying options in one place.</p>
+        <form class="search-form" id="search-form" role="search">
+          <label class="sr-only" for="search-input">Search products</label><span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="search-input" type="search" autocomplete="off" placeholder="Search product, brand, model, UPC, category, or retailer…">
+          <button class="button button-primary search-button" type="submit">Search</button>
+        </form>
+        <p class="search-hint">Try “DeWalt,” “gaming,” “Best Buy,” or a model number.</p>
+      </div>
+    </section>
 
-    <div class="step">
+    <section class="category-section section" id="categories" aria-labelledby="categories-title">
+      <div class="shell">
+        <div class="section-heading centered"><p class="eyebrow">Browse by department</p><h2 id="categories-title">Popular Categories</h2><p>Select a category to explore the sample product catalog.</p></div>
+        <div class="category-grid" id="category-grid"></div>
+      </div>
+    </section>
 
-      <div class="number">2</div>
+    <section class="results-section section" id="results" aria-labelledby="results-title" hidden>
+      <div class="shell">
+        <div class="results-heading">
+          <div><p class="eyebrow">Sample catalog</p><h2 id="results-title">Search Results</h2><p id="results-summary" aria-live="polite"></p></div>
+          <button class="text-button" id="clear-search" type="button">Clear search & filters</button>
+        </div>
+        <div class="results-layout">
+          <aside class="filters" id="filters" aria-label="Product filters">
+            <div class="filter-header"><h3>Filter results</h3><button class="text-button mobile-filter-close" id="filter-close" type="button">Done</button></div>
+            <label>Category<select id="category-filter"><option value="">All categories</option></select></label>
+            <label>Retailer<select id="retailer-filter"><option value="">All retailers</option></select></label>
+            <div class="price-fields">
+              <label>Minimum price<input id="min-price" type="number" min="0" step="1" placeholder="$0"></label>
+              <label>Maximum price<input id="max-price" type="number" min="0" step="1" placeholder="Any"></label>
+            </div>
+            <label>Availability<select id="availability-filter"><option value="">Any availability</option><option value="available">Available now</option><option value="pickup">Pickup available</option></select></label>
+          </aside>
+          <div class="results-main">
+            <div class="results-toolbar">
+              <button class="button button-secondary filter-toggle" id="filter-toggle" type="button">Filters</button>
+              <label class="sort-control">Sort by<select id="sort-select"><option value="low">Lowest Price</option><option value="high">Highest Price</option><option value="name">Product Name</option></select></label>
+            </div>
+            <div class="product-grid" id="product-grid"></div>
+            <div class="empty-state" id="empty-state" hidden><div class="empty-icon" aria-hidden="true">⌕</div><h3>No matching products found yet.</h3><p>Try another search term or adjust your filters.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-      <h3>Compare</h3>
+    <section class="comparison-section section" id="comparison" aria-labelledby="comparison-title" hidden><div class="shell"><div id="comparison-content"></div></div></section>
 
-      <p>
-        Compare buying options from different
-        retailers in one simple place.
-      </p>
+    <section class="deals-section section" id="deals" aria-labelledby="deals-title">
+      <div class="shell">
+        <div class="section-heading split-heading"><div><p class="eyebrow">Sample savings</p><h2 id="deals-title">Today's Deals</h2><p>Development examples showing how discounted offers may appear.</p></div><span class="sample-label">Sample data</span></div>
+        <div class="deal-grid" id="deal-grid"></div>
+      </div>
+    </section>
 
+    <section class="shopping-section section" id="shopping-list" aria-labelledby="shopping-title">
+      <div class="shell"><div class="shopping-panel">
+        <div class="section-heading split-heading"><div><p class="eyebrow">Saved on this device</p><h2 id="shopping-title">Shopping List</h2><p>Keep products handy while you compare. Your list stays in this browser.</p></div><button class="text-button danger" id="clear-list" type="button" hidden>Clear list</button></div>
+        <div class="shopping-list" id="shopping-list-items"></div>
+      </div></div>
+    </section>
+
+    <section class="how-section section" id="how" aria-labelledby="how-title">
+      <div class="shell">
+        <div class="section-heading centered"><p class="eyebrow">Simple by design</p><h2 id="how-title">How Price Alert Works</h2></div>
+        <div class="steps">
+          <article class="step"><span>1</span><h3>Search</h3><p>Find sample products by name, brand, model, item number, UPC, category, or retailer.</p></article>
+          <article class="step"><span>2</span><h3>Compare</h3><p>Review retailer offers side by side, sorted by price, availability, and fulfillment options.</p></article>
+          <article class="step"><span>3</span><h3>Save</h3><p>Build a shopping list and prepare price alerts for the future live service.</p></article>
+        </div>
+        <div class="disclosure" id="affiliate-disclosure"><strong>Affiliate Disclosure</strong><p>Price Alert may earn a commission when you purchase through certain links on our site. This does not increase the price you pay.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div><a class="logo footer-logo" href="#top">PRICE <span>ALERT</span></a><p>Search it. Compare it. Save.</p><p class="footer-note">Development version using sample data only.</p></div>
+      <nav class="footer-nav" aria-label="Footer navigation"><button type="button" data-dialog="about">About</button><a href="#how">How It Works</a><button type="button" data-dialog="privacy">Privacy</button><button type="button" data-dialog="terms">Terms</button><button type="button" data-dialog="contact">Contact</button><a href="#affiliate-disclosure">Affiliate Disclosure</a></nav>
     </div>
+    <div class="shell footer-bottom">© 2026 Price Alert. Early development version.</div>
+  </footer>
 
-
-    <div class="step">
-
-      <div class="number">3</div>
-
-      <h3>Save</h3>
-
-      <p>
-        Choose the buying option that works best
-        for you and go directly to the retailer.
-      </p>
-
-    </div>
-
-  </div>
-
-
-  <div class="disclosure">
-
-    <strong>Affiliate Disclosure:</strong>
-
-    Price Alert may earn a commission when you purchase
-    through certain links on our site. This does not
-    increase the price you pay.
-
-  </div>
-
-</section>
-
-
-<footer>
-
-  © 2026 Price Alert • Early Development Version
-
-</footer>
-
-
-<script>
-  const searchForm = document.getElementById('product-search');
-  const searchInput = document.getElementById('search-input');
-  const searchResults = document.getElementById('search-results');
-  const productCards = Array.from(document.querySelectorAll('.product-card'));
-  const noResults = document.getElementById('no-results');
-
-  searchForm.addEventListener('submit', function (event) {
-    event.preventDefault();
-
-    const searchText = searchInput.value.trim().toLowerCase();
-
-    if (!searchText) {
-      searchResults.hidden = true;
-      return;
-    }
-
-    let matchCount = 0;
-
-    productCards.forEach(function (card) {
-      const isMatch = card.textContent.toLowerCase().includes(searchText);
-      card.hidden = !isMatch;
-
-      if (isMatch) {
-        matchCount += 1;
-      }
-    });
-
-    noResults.hidden = matchCount !== 0;
-    searchResults.hidden = false;
-  });
-</script>
-
-
+  <dialog class="info-dialog" id="info-dialog" aria-labelledby="dialog-title"><button class="dialog-close" id="dialog-close" type="button" aria-label="Close">×</button><div id="dialog-content"></div></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js"></script>
 </body>
 </html>
