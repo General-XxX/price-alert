@@ -1,0 +1,58 @@
+[
+  {
+    "id": "feed-dewalt-dcd771c2",
+    "brand": "DeWalt",
+    "productName": "20V MAX Cordless Drill Kit",
+    "modelNumber": "DCD771C2",
+    "upc": "885911325905",
+    "category": "Tools",
+    "specifications": { "voltage": "20V MAX", "toolOnly": false },
+    "offers": [
+      {
+        "offerId": "dewalt-drill-home-depot-1",
+        "retailerId": "home-depot",
+        "retailerName": "Home Depot",
+        "retailerModelNumber": "DCD771C2",
+        "variantId": "dewalt-drill-default",
+        "price": 97.99,
+        "regularPrice": 129,
+        "currency": "USD",
+        "availability": "Development feed availability",
+        "stockStatus": "in-stock",
+        "lastChecked": "2026-08-29T12:00:00.000Z",
+        "lastPriceChange": "2026-08-29T12:00:00.000Z",
+        "dataSource": "daily-sample-feed",
+        "dataStatus": "sample-development"
+      }
+    ],
+    "sourceMetadata": { "adapter": "development-sample", "sourceUpdatedAt": "2026-08-29T12:00:00.000Z" },
+    "lastUpdated": "2026-08-29T12:00:00.000Z",
+    "dataStatus": "sample-development"
+  },
+  {
+    "id": "fixture-daily-new-product",
+    "brand": "Fixture Brand",
+    "productName": "Daily Update Test Product",
+    "modelNumber": "DAILY-TEST-01",
+    "upc": "000000000099",
+    "category": "Tools",
+    "description": "Development-only product used to test safe daily additions.",
+    "specifications": { "configuration": "Development fixture" },
+    "variants": [{ "variantId": "fixture-daily-new-product-default", "variantName": "Default configuration", "modelNumber": "DAILY-TEST-01", "upc": "000000000099", "isDefaultVariant": true, "variantStatus": "sample-development" }],
+    "offers": [{ "offerId": "fixture-daily-new-product-walmart-1", "retailerId": "walmart", "retailerName": "Walmart", "variantId": "fixture-daily-new-product-default", "price": 24.99, "currency": "USD", "availability": "Development feed availability", "stockStatus": "in-stock", "lastChecked": "2026-08-29T12:00:00.000Z", "dataSource": "daily-sample-feed", "dataStatus": "sample-development" }],
+    "sourceMetadata": { "adapter": "development-sample", "sourceUpdatedAt": "2026-08-29T12:00:00.000Z" },
+    "lastUpdated": "2026-08-29T12:00:00.000Z",
+    "dataStatus": "sample-development"
+  },
+  {
+    "id": "fixture-incompatible-dewalt",
+    "brand": "DeWalt",
+    "productName": "20V MAX Cordless Drill Tool Only",
+    "modelNumber": "DCD771C2",
+    "upc": "885911325905",
+    "category": "Tools",
+    "specifications": { "toolOnly": true, "bundleContents": ["Drill/driver"] },
+    "sourceMetadata": { "adapter": "development-sample", "sourceUpdatedAt": "2026-08-29T12:00:00.000Z" },
+    "dataStatus": "sample-development"
+  }
+]

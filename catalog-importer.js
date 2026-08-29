@@ -156,5 +156,7 @@
     return results;
   })();
 
-  window.PriceAlertImporter = Object.freeze({ importBatch, normalizeProduct, normalizeOffer, normalizeMedia, parseCsv, developmentTests });
+  const api = Object.freeze({ importBatch, normalizeProduct, normalizeOffer, normalizeMedia, parseCsv, developmentTests });
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (typeof window !== "undefined") window.PriceAlertImporter = api;
 }());
