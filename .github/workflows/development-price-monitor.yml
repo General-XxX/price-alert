@@ -1,0 +1,31 @@
+name: Development price monitoring
+
+on:
+  schedule:
+    - cron: "43 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-monitoring-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run monitoring tests
+        run: node scripts/tests/price-monitoring.test.js
+      - name: Exercise sample monitoring with mock email only
+        run: node scripts/run-price-monitor.js --report artifacts/price-monitor-development-report.json
+      - name: Verify report contains no email addresses
+        run: "! grep -Eiq '[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}' artifacts/price-monitor-development-report.json"
+      - name: Upload safe aggregate report
+        uses: actions/upload-artifact@v4
+        with:
+          name: development-price-monitor-report
+          path: artifacts/price-monitor-development-report.json
+          if-no-files-found: error
+          retention-days: 14

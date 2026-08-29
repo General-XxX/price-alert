@@ -38,23 +38,43 @@
       currency: currency || "USD",
       currentLowestPrice: current,
       createdAt,
+      updatedAt: createdAt,
       active: true,
       status: "active",
+      lastCheckedAt: null,
+      triggeredAt: null,
+      lastNotificationAt: null,
+      notificationStatus: "not-sent",
       storageType: "local-device"
     };
     return { ok:true, alert:record };
   }
 
+  class BrowserAlertStore {
+    list() { return loadAlerts(); }
+    upsert(record) {
+      const alerts = loadAlerts();
+      const existingIndex = alerts.findIndex(alert => alert.productId === record.productId && (alert.variantId || null) === (record.variantId || null) && alert.email === record.email && alert.currency === record.currency);
+      if (existingIndex >= 0) {
+        record.alertId = alerts[existingIndex].alertId;
+        record.createdAt = alerts[existingIndex].createdAt;
+        record.updatedAt = new Date().toISOString();
+        alerts[existingIndex] = { ...alerts[existingIndex], ...record };
+      } else alerts.push(record);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
+      return { record, created:existingIndex < 0 };
+    }
+  }
+
+  const browserAlertStore = new BrowserAlertStore();
+
   function saveProductAlert(input) {
     const result = createAlertRecord(input);
     if (!result.ok) return result;
     const record = result.alert;
-    const alerts = loadAlerts();
-    const existingIndex = alerts.findIndex(alert => alert.productId === record.productId && alert.variantId === record.variantId && alert.email === record.email && alert.active !== false);
-    if (existingIndex >= 0) alerts[existingIndex] = record; else alerts.push(record);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
-      return { ok:true, alert:record };
+      const stored = browserAlertStore.upsert(record);
+      return { ok:true, alert:stored.record, created:stored.created };
     } catch {
       return { ok:false, error:"The price alert could not be saved on this device." };
     }
@@ -121,5 +141,5 @@
     return results;
   })();
 
-  window.PriceAlertStorage = Object.freeze({ STORAGE_KEY, validEmail, validMoney, loadAlerts, createAlertRecord, saveProductAlert, targetPriceValue, renderTargetAlert, mountTargetAlert, developmentAlertTests });
+  window.PriceAlertStorage = Object.freeze({ STORAGE_KEY, BrowserAlertStore, browserAlertStore, validEmail, validMoney, loadAlerts, createAlertRecord, saveProductAlert, targetPriceValue, renderTargetAlert, mountTargetAlert, developmentAlertTests });
 }());

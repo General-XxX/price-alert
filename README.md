@@ -34,3 +34,20 @@ approved retailer feed/API
   -> catalog loader
   -> homepage and reusable product pages
 ```
+
+## Step 5 price monitoring and alerts
+
+The monitoring foundation lives in `scripts/monitoring/`. It separates offer validation, price observations/history, deal detection, alert persistence, alert evaluation, destination selection, email composition, provider delivery, privacy redaction, and upstream-outage handling.
+
+The scheduled `development-price-monitor.yml` workflow uses the development catalog and the no-send mock provider. Its artifact contains aggregate counts only. It never reads real customer records, sends email, writes production history, or publishes catalog changes.
+
+GitHub Pages remains a static front end. Browser alerts are stored only on the shopper's device through `BrowserAlertStore`. A production system must move these responsibilities to a secure backend before activation:
+
+- encrypted customer-alert storage and authenticated alert-management endpoints;
+- scheduled approved retailer refreshes and durable price-history storage;
+- server-side alert checking and transactional notification locking;
+- a configured email provider with environment-only credentials;
+- signed unsubscribe/management URLs, suppression handling, and delivery webhooks;
+- retention, deletion, consent, abuse prevention, monitoring, retry, and audit policies.
+
+Real email delivery is deliberately unavailable: `productionProvider()` fails closed. The provider-neutral message and engine interfaces can later support Resend, SendGrid, Amazon SES, or another approved service without putting credentials or customer addresses into the public repository.
