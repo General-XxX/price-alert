@@ -1,5 +1,5 @@
-// Interface logic consumes the catalog contract exposed by products.js.
-const catalog = window.PriceAlertData;
+// Interface logic consumes either the approved generated catalog or products.js fallback.
+window.PriceAlertCatalogReady.then(catalog => {
 const alertStorage = window.PriceAlertStorage;
 
 if (!catalog || !Array.isArray(catalog.products) || !Array.isArray(catalog.categories) || !alertStorage) {
@@ -83,10 +83,15 @@ const discountAmount = (product) => {
   const bestOffer = lowestOffer(product);
   return bestOffer ? calculateOfferSavingsAmount(bestOffer) : 0;
 };
-const productDetailPath = product => product && product.id === "dewalt-drill" ? "products/dewalt-dcd771c2/index.html" : null;
+const productDetailPath = product => product && product.slug ? `products/index.html?slug=${encodeURIComponent(product.slug)}` : null;
 const productTitleMarkup = product => {
   const path = productDetailPath(product);
   return path ? `<a class="product-title-link" href="${path}">${escapeHtml(product.name)}</a>` : escapeHtml(product.name);
+};
+const linkedProductMedia = (product, options) => {
+  const path = productDetailPath(product);
+  const media = renderProductMedia(product, options);
+  return path ? `<a class="product-media-link" href="${path}" aria-label="View ${escapeHtml(product.brand)} ${escapeHtml(product.name)} details">${media}</a>` : media;
 };
 if (!window.PriceAlertRetailerLinks) throw new Error("Price Alert retailer link helpers failed to load.");
 const { validExternalUrl, retailerSearchUrl, resolveOfferDestination, retailerSearchUrls:RETAILER_SEARCH_URLS } = window.PriceAlertRetailerLinks;
@@ -379,6 +384,11 @@ function isValidMediaUrl(value) {
   }
 }
 
+function isAuthorizedProductImage(media) {
+  if (!media || !isValidMediaUrl(media.primaryImage)) return false;
+  return Boolean(media.imageSource && /(authorized|licensed|permission-granted|owned-asset|public-domain|affiliate-feed|manufacturer-feed|retailer-feed)/i.test(media.imageLicenseOrPermission || ""));
+}
+
 function productImageAlt(product) {
   const configuredAlt = product.media && product.media.imageAlt;
   return configuredAlt && configuredAlt.trim() ? configuredAlt.trim() : `${product.brand} ${product.name} product image`;
@@ -386,7 +396,7 @@ function productImageAlt(product) {
 
 function renderProductMedia(product, { lazy = true } = {}) {
   const media = product.media || {};
-  const hasImage = isValidMediaUrl(media.primaryImage);
+  const hasImage = isAuthorizedProductImage(media);
   const altText = productImageAlt(product);
   const placeholderText = product.specifications && product.specifications.visualMark ? product.specifications.visualMark : "PA";
   const placeholderLabel = `Product visual for ${product.brand} ${product.name}`;
@@ -420,7 +430,7 @@ function runDevelopmentMediaTests() {
   const placeholderMarkup = renderProductMedia(sampleProduct);
   const futureImageProduct = {
     ...sampleProduct,
-    media: { ...sampleProduct.media, primaryImage: syntheticImageUrl, imageAlt:"Authorized sample product image", mediaStatus:"authorized" }
+    media: { ...sampleProduct.media, primaryImage: syntheticImageUrl, imageAlt:"Authorized sample product image", imageSource:"development-test", imageLicenseOrPermission:"authorized", mediaStatus:"authorized" }
   };
   const imageMarkup = renderProductMedia(futureImageProduct);
   const testContainer = document.createElement("div");
@@ -446,6 +456,7 @@ function runDevelopmentMediaTests() {
 const developmentMediaTestResults = runDevelopmentMediaTests();
 window.PriceAlertMedia = Object.freeze({
   isValidMediaUrl,
+  isAuthorizedProductImage,
   productImageAlt,
   renderProductMedia,
   fallbackProductImage,
@@ -495,7 +506,7 @@ function renderResults({scroll=false}={}) {
   $("#results").hidden = false;
   $("#product-grid").innerHTML = matches.map(product => `
     <article class="product-card">
-      ${renderProductMedia(product)}
+      ${linkedProductMedia(product)}
       <div class="product-body"><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${productTitleMarkup(product)}</h3>
         <p class="product-meta">Model ${escapeHtml(product.modelNumber)} · ${escapeHtml(product.category)}</p>
         <div class="product-price-row"><div class="from-price"><small>Lowest price</small><strong>${money(lowest(product))}</strong></div><span class="store-count">${product.offers.length} stores<br>offering it</span></div>
@@ -521,7 +532,7 @@ function renderDeals() {
   $("#deal-grid").innerHTML = deals.map(product => {
     const bestOffer = lowestOffer(product);
     const savings = Math.round(calculateOfferSavingsPercent(bestOffer));
-    return `<article class="deal-card">${renderProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${productTitleMarkup(product)}</h3><div class="deal-prices"><strong>${money(currentOfferPrice(bestOffer), bestOffer.currency)}</strong><del>${money(bestOffer.regularPrice, bestOffer.currency)}</del></div><p class="savings">Save ${savings}% on this offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare prices →</button></div></article>`;
+    return `<article class="deal-card">${linkedProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${productTitleMarkup(product)}</h3><div class="deal-prices"><strong>${money(currentOfferPrice(bestOffer), bestOffer.currency)}</strong><del>${money(bestOffer.regularPrice, bestOffer.currency)}</del></div><p class="savings">Save ${savings}% on this offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare prices →</button></div></article>`;
   }).join("");
 }
 
@@ -602,3 +613,4 @@ if (initialCategory && categories.some(category => category.name === initialCate
   renderResults();
 }
 renderDeals(); renderShoppingList();
+});

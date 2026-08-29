@@ -1,0 +1,45 @@
+name: Production catalog publish (disabled by default)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configuration-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm production publishing remains disabled
+        if: ${{ vars.PRICE_ALERT_PRODUCTION_PUBLISH_ENABLED != 'true' }}
+        run: echo "Production publishing is disabled. Configure the protected environment and repository variables before enabling it."
+
+  generate-approved-catalog:
+    if: ${{ vars.PRICE_ALERT_PRODUCTION_PUBLISH_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: catalog-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Require an approved feed path
+        env:
+          APPROVED_FEED_PATH: ${{ vars.PRICE_ALERT_APPROVED_FEED_PATH }}
+        run: test -n "$APPROVED_FEED_PATH"
+      - name: Validate and generate the production catalog
+        env:
+          APPROVED_FEED_PATH: ${{ vars.PRICE_ALERT_APPROVED_FEED_PATH }}
+          APPROVED_ADAPTER: ${{ vars.PRICE_ALERT_APPROVED_ADAPTER }}
+        run: node scripts/update-catalog.js --mode publish --adapter "${APPROVED_ADAPTER:-generic-file}" --feed "$APPROVED_FEED_PATH" --report artifacts/catalog-publish-report.json --output data/catalog.generated.json
+      - name: Upload validated output for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: approved-catalog-candidate
+          path: |
+            artifacts/catalog-publish-report.json
+            data/catalog.generated.json
+          if-no-files-found: error
+          retention-days: 7

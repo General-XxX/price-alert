@@ -21,7 +21,13 @@ jobs:
           node-version: "22"
 
       - name: Run sample-feed update preview
-        run: node scripts/update-catalog.js --feed fixtures/daily-update-feed.json --report artifacts/daily-update-report.json --snapshot artifacts/catalog-update-preview.json
+        run: node scripts/update-catalog.js --mode preview --feed fixtures/daily-update-feed.json --report artifacts/daily-update-report.json --snapshot artifacts/catalog-update-preview.json
+
+      - name: Test production publishing safeguards
+        run: node scripts/tests/catalog-publishing.test.js
+
+      - name: Test Step 4 pipeline and public integration
+        run: node scripts/tests/step4.test.js
 
       - name: Upload update report and preview
         uses: actions/upload-artifact@v4

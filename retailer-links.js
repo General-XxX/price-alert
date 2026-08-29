@@ -7,7 +7,8 @@
     walmart: query => `https://www.walmart.com/search?q=${encodeURIComponent(query)}`,
     "best-buy": query => `https://www.bestbuy.com/site/searchpage.jsp?st=${encodeURIComponent(query)}`,
     ebay: query => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`,
-    amazon: query => `https://www.amazon.com/s?k=${encodeURIComponent(query)}`
+    amazon: query => `https://www.amazon.com/s?k=${encodeURIComponent(query)}`,
+    target: query => `https://www.target.com/s?searchTerm=${encodeURIComponent(query)}`
   });
 
   function validExternalUrl(value) {

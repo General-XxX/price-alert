@@ -93,6 +93,14 @@ function mergeOffers(existingOffers, incomingOffers) {
   return output;
 }
 
+function countOfferChanges(existingOffers, incomingOffers) {
+  return (incomingOffers || []).reduce((count, incoming) => {
+    const key = offerKey(incoming);
+    const existing = key ? (existingOffers || []).find(offer => offerKey(offer) === key) : null;
+    return count + (!existing || JSON.stringify(mergeKnown(existing, incoming)) !== JSON.stringify(existing) ? 1 : 0);
+  }, 0);
+}
+
 function mergeHistory(existingHistory, incomingHistory) {
   const output = [...(existingHistory || [])];
   (incomingHistory || []).forEach(entry => {
@@ -113,7 +121,7 @@ function mergeProduct(existing, incoming) {
 
 function updateCatalog(existingProducts, incomingProducts) {
   const products = existingProducts.map(product => structuredClone(product));
-  const report = { added:0, updated:0, unchanged:0, skipped:0, conflicts:0, errors:0, details:[] };
+  const report = { added:0, updated:0, unchanged:0, skipped:0, conflicts:0, errors:0, offersUpdated:0, details:[] };
   incomingProducts.forEach(incoming => {
     try {
       const candidates = products.map((product, index) => ({ product, index, match:matchProducts(product, incoming) }));
@@ -123,14 +131,15 @@ function updateCatalog(existingProducts, incomingProducts) {
       if (!matched) {
         const weak = candidates.find(candidate => candidate.match.matchedBy === "name-fallback");
         if (weak) { report.skipped += 1; report.details.push({ action:"review-required", incomingId:incoming.id, existingId:weak.product.id, matchedBy:"name-fallback" }); return; }
-        products.push(incoming); report.added += 1; report.details.push({ action:"added", productId:incoming.id }); return;
+        products.push(incoming); report.added += 1; report.offersUpdated += (incoming.offers || []).length; report.details.push({ action:"added", productId:incoming.id }); return;
       }
+      const offerChanges = countOfferChanges(matched.product.offers, incoming.offers);
       const merged = mergeProduct(matched.product, incoming);
       if (JSON.stringify(merged) === JSON.stringify(matched.product)) { report.unchanged += 1; report.details.push({ action:"unchanged", productId:matched.product.id, matchedBy:matched.match.matchedBy }); }
-      else { products[matched.index] = merged; report.updated += 1; report.details.push({ action:"updated", productId:matched.product.id, matchedBy:matched.match.matchedBy }); }
+      else { products[matched.index] = merged; report.updated += 1; report.offersUpdated += offerChanges; report.details.push({ action:"updated", productId:matched.product.id, matchedBy:matched.match.matchedBy }); }
     } catch (error) { report.errors += 1; report.details.push({ action:"error", incomingId:incoming && incoming.id, message:error.message }); }
   });
   return { products, report };
 }
 
-module.exports = { normalizeIdentifier, compareVariantCompatibility, matchProducts, mergeKnown, mergeOffers, mergeProduct, updateCatalog };
+module.exports = { normalizeIdentifier, compareVariantCompatibility, matchProducts, mergeKnown, mergeOffers, countOfferChanges, mergeProduct, updateCatalog };

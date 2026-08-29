@@ -6,8 +6,14 @@ function load({ source, importer }) {
   const absolutePath = path.resolve(source);
   const contents = fs.readFileSync(absolutePath, "utf8");
   const format = path.extname(absolutePath).toLowerCase() === ".csv" ? "csv" : "json";
-  const imported = importer.importBatch(contents, { format, dataStatus:"sample-development" });
-  return { ...imported, adapter:"json-file", source:absolutePath };
+  let metadata = {};
+  let importInput = contents;
+  if (format === "json") {
+    const parsed = JSON.parse(contents);
+    if (!Array.isArray(parsed)) { metadata = parsed.metadata || {}; importInput = parsed.products || []; }
+  }
+  const imported = importer.importBatch(importInput, { format, dataStatus:metadata.dataStatus || "sample-development" });
+  return { ...imported, metadata, adapter:"json-file", source:absolutePath };
 }
 
 module.exports = { adapterId:"json-file", load };

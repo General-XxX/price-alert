@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const RETAILER_IDS = Object.freeze({ "lowe's":"lowes", "lowes":"lowes", "home depot":"home-depot", "walmart":"walmart", "best buy":"best-buy", "ebay":"ebay", "amazon":"amazon" });
+  const RETAILER_IDS = Object.freeze({ "lowe's":"lowes", "lowes":"lowes", "home depot":"home-depot", "walmart":"walmart", "best buy":"best-buy", "ebay":"ebay", "amazon":"amazon", "target":"target" });
   const text = value => value === null || value === undefined || String(value).trim() === "" ? null : String(value).trim();
   const number = value => {
     if (value === null || value === undefined || value === "") return null;
@@ -31,7 +31,8 @@
     const incoming = structured(record.media || record.mediaJson, {}) || {};
     const permission = text(incoming.imageLicenseOrPermission || record.imageLicenseOrPermission);
     const candidate = httpUrl(incoming.primaryImage || record.primaryImage || record.imageUrl || record.image);
-    const permissionAllowsUse = Boolean(permission && /(authorized|licensed|permission-granted|owned-asset|public-domain|affiliate-feed|manufacturer-feed|retailer-feed)/i.test(permission));
+    const imageSource = text(incoming.imageSource || record.imageSource);
+    const permissionAllowsUse = Boolean(imageSource && permission && /(authorized|licensed|permission-granted|owned-asset|public-domain|affiliate-feed|manufacturer-feed|retailer-feed)/i.test(permission));
     const primaryImage = candidate && permissionAllowsUse ? candidate : null;
     const galleryCandidates = structured(incoming.galleryImages || record.galleryImages, []);
     const galleryImages = permissionAllowsUse && Array.isArray(galleryCandidates) ? galleryCandidates.map(httpUrl).filter(Boolean) : [];
@@ -40,7 +41,7 @@
       galleryImages,
       thumbnail: permissionAllowsUse ? httpUrl(incoming.thumbnail || record.thumbnail) : null,
       imageAlt: text(incoming.imageAlt || record.imageAlt),
-      imageSource: text(incoming.imageSource || record.imageSource),
+      imageSource,
       imageSourceType: text(incoming.imageSourceType || record.imageSourceType) || (primaryImage ? "authorized-import" : "placeholder"),
       imageLicenseOrPermission: permission,
       imageLastUpdated: text(incoming.imageLastUpdated || record.imageLastUpdated),
@@ -149,7 +150,7 @@
   const developmentTests = (() => {
     const json = importBatch(JSON.stringify([{ brand:"Fixture", productName:"Widget A", model:"A-1", offers:[{ retailer:"Amazon", price:"19.99", currency:"USD" }] }, { brand:"Fixture", productName:"Widget B", model:"B-2" }]));
     const csv = importBatch('brand,productName,model,upc\nFixture,CSV Widget,C-3,000000000003', { format:"csv" });
-    const authorized = normalizeProduct({ brand:"Fixture", name:"Image Widget", model:"IMG-1", imageUrl:"https://example.invalid/authorized.webp", imageLicenseOrPermission:"authorized-feed" }).product;
+    const authorized = normalizeProduct({ brand:"Fixture", name:"Image Widget", model:"IMG-1", imageUrl:"https://example.invalid/authorized.webp", imageSource:"development-test", imageLicenseOrPermission:"authorized-feed" }).product;
     const unverified = normalizeProduct({ brand:"Fixture", name:"Unverified Image", model:"IMG-2", imageUrl:"https://example.invalid/unverified.webp" }).product;
     const results = { jsonBatch:json.products.length === 2 && !json.errors.length, csvBatch:csv.products.length === 1 && csv.products[0].identity.upc === "000000000003", priceNormalized:json.products[0].offers[0].price === 19.99, authorizedImageAccepted:Boolean(authorized.media.primaryImage), unverifiedImageRejected:unverified.media.primaryImage === null };
     Object.entries(results).forEach(([name, passed]) => console.assert(passed, `Importer test failed: ${name}`));
