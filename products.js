@@ -33,6 +33,26 @@
       category: config.category,
       description: config.description,
       image: null,
+      identity: {
+        brand: config.brand,
+        manufacturer: null,
+        modelNumber: config.modelNumber,
+        mpn: null,
+        upc: config.upc,
+        gtin: null,
+        sku: null,
+        color: null,
+        size: null,
+        variant: null,
+        packageQuantity: null
+      },
+      retailerIdentifiers: {},
+      matching: {
+        matchStatus: "development-sample",
+        matchConfidence: "not-evaluated",
+        matchedBy: [],
+        reviewRequired: true
+      },
       specifications: {
         itemNumber: config.itemNumber,
         upc: config.upc,
@@ -83,7 +103,7 @@
   const retailers = ["Lowe's", "Home Depot", "Walmart", "Best Buy", "eBay", "Amazon"];
 
   window.PriceAlertData = Object.freeze({
-    schemaVersion: "1.0.0",
+    schemaVersion: "1.1.0",
     dataStatus: DATA_STATUS,
     products,
     categories,

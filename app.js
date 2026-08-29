@@ -20,6 +20,137 @@ const discountAmount = (product) => {
 const offerDestination = (item) => item.affiliateUrl || item.productUrl || "#";
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char]);
 
+// Product identity helpers are intentionally independent of the current UI so
+// future retailer-feed importers can reuse the same comparison contract.
+function identityValue(product, key) {
+  if (product.identity && Object.prototype.hasOwnProperty.call(product.identity, key)) return product.identity[key];
+  if (key === "brand") return product.brand;
+  if (key === "modelNumber") return product.modelNumber;
+  if (key === "upc") return product.specifications && product.specifications.upc;
+  return null;
+}
+
+function normalizeTradeIdentifier(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim().toUpperCase().replace(/[\s-]+/g, "");
+}
+
+function normalizeModelIdentifier(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).normalize("NFKC").trim().toUpperCase().replace(/[\s\-_.\/]+/g, "");
+}
+
+function normalizeIdentityText(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).normalize("NFKC").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function exactIdentityMatch(first, second, key, normalizer = normalizeModelIdentifier) {
+  const firstValue = normalizer(identityValue(first, key));
+  const secondValue = normalizer(identityValue(second, key));
+  return Boolean(firstValue && secondValue && firstValue === secondValue);
+}
+
+function hasRetailerIdentifierMatch(first, second) {
+  const firstIdentifiers = first.retailerIdentifiers || {};
+  const secondIdentifiers = second.retailerIdentifiers || {};
+
+  return Object.keys(firstIdentifiers).some(retailer => {
+    const firstRetailer = firstIdentifiers[retailer] || {};
+    const secondRetailer = secondIdentifiers[retailer] || {};
+    return Object.keys(firstRetailer).some(field => {
+      const firstValue = normalizeModelIdentifier(firstRetailer[field]);
+      const secondValue = normalizeModelIdentifier(secondRetailer[field]);
+      return Boolean(firstValue && secondValue && firstValue === secondValue);
+    });
+  });
+}
+
+function productNameSimilarity(firstName, secondName) {
+  const firstTokens = new Set(normalizeIdentityText(firstName).split(" ").filter(token => token.length > 1));
+  const secondTokens = new Set(normalizeIdentityText(secondName).split(" ").filter(token => token.length > 1));
+  if (!firstTokens.size || !secondTokens.size) return 0;
+  const intersection = [...firstTokens].filter(token => secondTokens.has(token)).length;
+  const union = new Set([...firstTokens, ...secondTokens]).size;
+  return intersection / union;
+}
+
+function compareProductIdentity(first, second) {
+  if (!first || !second) return { isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true };
+
+  if (exactIdentityMatch(first, second, "upc", normalizeTradeIdentifier)) {
+    return { isMatch:true, confidence:"high", matchedBy:"upc", reviewRequired:false };
+  }
+  if (exactIdentityMatch(first, second, "gtin", normalizeTradeIdentifier)) {
+    return { isMatch:true, confidence:"high", matchedBy:"gtin", reviewRequired:false };
+  }
+  const firstUpc = normalizeTradeIdentifier(identityValue(first, "upc"));
+  const secondUpc = normalizeTradeIdentifier(identityValue(second, "upc"));
+  const firstGtin = normalizeTradeIdentifier(identityValue(first, "gtin"));
+  const secondGtin = normalizeTradeIdentifier(identityValue(second, "gtin"));
+  if ((firstUpc && firstUpc === secondGtin) || (firstGtin && firstGtin === secondUpc)) {
+    return { isMatch:true, confidence:"high", matchedBy:"gtin", reviewRequired:false };
+  }
+
+  const manufacturerMatches = exactIdentityMatch(first, second, "manufacturer", normalizeIdentityText);
+  const modelMatches = exactIdentityMatch(first, second, "modelNumber");
+  if (manufacturerMatches && modelMatches) {
+    return { isMatch:true, confidence:"high", matchedBy:"model", reviewRequired:false };
+  }
+  if (exactIdentityMatch(first, second, "mpn")) {
+    return { isMatch:true, confidence:"high", matchedBy:"mpn", reviewRequired:false };
+  }
+  if (hasRetailerIdentifierMatch(first, second)) {
+    return { isMatch:true, confidence:"high", matchedBy:"retailer-id", reviewRequired:false };
+  }
+
+  const firstModel = normalizeModelIdentifier(identityValue(first, "modelNumber"));
+  const secondModel = normalizeModelIdentifier(identityValue(second, "modelNumber"));
+  if (firstModel && secondModel && firstModel !== secondModel) {
+    return { isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true };
+  }
+
+  const brandMatches = exactIdentityMatch(first, second, "brand", normalizeIdentityText);
+  if (brandMatches && modelMatches) {
+    return { isMatch:true, confidence:"medium", matchedBy:"model", reviewRequired:true };
+  }
+
+  if (productNameSimilarity(first.name, second.name) >= 0.6) {
+    return { isMatch:false, confidence:"low", matchedBy:"name-fallback", reviewRequired:true };
+  }
+  return { isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true };
+}
+
+function runDevelopmentMatchingTests() {
+  const source = products[0];
+  const withoutStrongIdentifiers = { ...source, retailerIdentifiers:{}, identity:{ ...source.identity, upc:null, gtin:null, mpn:null, manufacturer:null } };
+  const results = {
+    sameUpcAndModel: compareProductIdentity(source, { ...source, id:"development-copy" }),
+    formattedBrandModel: compareProductIdentity(withoutStrongIdentifiers, { ...withoutStrongIdentifiers, identity:{ ...withoutStrongIdentifiers.identity, modelNumber:"DCD-771 C2" } }),
+    differentModel: compareProductIdentity(withoutStrongIdentifiers, { ...withoutStrongIdentifiers, identity:{ ...withoutStrongIdentifiers.identity, modelNumber:"DCD999" } }),
+    similarNameOnly: compareProductIdentity(
+      { ...withoutStrongIdentifiers, brand:null, identity:{ ...withoutStrongIdentifiers.identity, brand:null, modelNumber:null }, name:"20V MAX Cordless Drill Kit" },
+      { ...withoutStrongIdentifiers, brand:null, identity:{ ...withoutStrongIdentifiers.identity, brand:null, modelNumber:null }, name:"20V Max Cordless Drill Kit Bundle" }
+    )
+  };
+
+  console.assert(results.sameUpcAndModel.isMatch && results.sameUpcAndModel.confidence === "high", "Matching test failed: exact UPC/model");
+  console.assert(results.formattedBrandModel.isMatch && results.formattedBrandModel.matchedBy === "model", "Matching test failed: normalized brand/model");
+  console.assert(!results.differentModel.isMatch, "Matching test failed: different models must not match");
+  console.assert(!results.similarNameOnly.isMatch && results.similarNameOnly.confidence === "low", "Matching test failed: name similarity is only a candidate signal");
+  return results;
+}
+
+const developmentMatchingTestResults = runDevelopmentMatchingTests();
+window.PriceAlertMatching = Object.freeze({
+  normalizeTradeIdentifier,
+  normalizeModelIdentifier,
+  normalizeIdentityText,
+  productNameSimilarity,
+  compareProductIdentity,
+  developmentMatchingTestResults
+});
+
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem("priceAlertShoppingList") || "[]").filter(id => typeof id === "string"); }
   catch { return []; }
