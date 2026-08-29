@@ -75,54 +75,100 @@ function productNameSimilarity(firstName, secondName) {
   return intersection / union;
 }
 
+const VARIANT_CRITICAL_FIELDS = Object.freeze([
+  "toolOnly", "storage", "screenSize", "memory", "packageQuantity",
+  "bundleContents", "configuration", "capacity", "size", "platform", "edition"
+]);
+
+function defaultVariant(product) {
+  if (!product || !Array.isArray(product.variants)) return null;
+  return product.variants.find(variant => variant.isDefaultVariant) || product.variants[0] || null;
+}
+
+function variantCriticalValue(product, key) {
+  const variant = defaultVariant(product);
+  if (variant && Object.prototype.hasOwnProperty.call(variant, key) && variant[key] !== null && variant[key] !== "" && (!Array.isArray(variant[key]) || variant[key].length)) return variant[key];
+  if (product.specifications && Object.prototype.hasOwnProperty.call(product.specifications, key)) return product.specifications[key];
+  if (product.identity && Object.prototype.hasOwnProperty.call(product.identity, key)) return product.identity[key];
+  return null;
+}
+
+function normalizeVariantValue(value) {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (Array.isArray(value)) return value.map(normalizeVariantValue).filter(Boolean).sort().join("|");
+  return String(value).normalize("NFKC").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "");
+}
+
+function compareVariantCompatibility(first, second) {
+  if (!first || !second) return { compatible:false, conflicts:["missing-product"], reviewRequired:true };
+  const conflicts = VARIANT_CRITICAL_FIELDS.filter(field => {
+    const firstValue = normalizeVariantValue(variantCriticalValue(first, field));
+    const secondValue = normalizeVariantValue(variantCriticalValue(second, field));
+    return Boolean(firstValue && secondValue && firstValue !== secondValue);
+  });
+  return { compatible:conflicts.length === 0, conflicts, reviewRequired:conflicts.length > 0 };
+}
+
 function compareProductIdentity(first, second) {
   if (!first || !second) return { isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true };
 
+  const variantCompatibility = compareVariantCompatibility(first, second);
+  const finish = candidate => {
+    if (!variantCompatibility.compatible) {
+      return { isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true, variantCompatibility };
+    }
+    return { ...candidate, reviewRequired:Boolean(candidate.reviewRequired || variantCompatibility.reviewRequired), variantCompatibility };
+  };
+
   if (exactIdentityMatch(first, second, "upc", normalizeTradeIdentifier)) {
-    return { isMatch:true, confidence:"high", matchedBy:"upc", reviewRequired:false };
+    return finish({ isMatch:true, confidence:"high", matchedBy:"upc", reviewRequired:false });
   }
   if (exactIdentityMatch(first, second, "gtin", normalizeTradeIdentifier)) {
-    return { isMatch:true, confidence:"high", matchedBy:"gtin", reviewRequired:false };
+    return finish({ isMatch:true, confidence:"high", matchedBy:"gtin", reviewRequired:false });
   }
   const firstUpc = normalizeTradeIdentifier(identityValue(first, "upc"));
   const secondUpc = normalizeTradeIdentifier(identityValue(second, "upc"));
   const firstGtin = normalizeTradeIdentifier(identityValue(first, "gtin"));
   const secondGtin = normalizeTradeIdentifier(identityValue(second, "gtin"));
   if ((firstUpc && firstUpc === secondGtin) || (firstGtin && firstGtin === secondUpc)) {
-    return { isMatch:true, confidence:"high", matchedBy:"gtin", reviewRequired:false };
+    return finish({ isMatch:true, confidence:"high", matchedBy:"gtin", reviewRequired:false });
   }
 
   const manufacturerMatches = exactIdentityMatch(first, second, "manufacturer", normalizeIdentityText);
   const modelMatches = exactIdentityMatch(first, second, "modelNumber");
   if (manufacturerMatches && modelMatches) {
-    return { isMatch:true, confidence:"high", matchedBy:"model", reviewRequired:false };
+    return finish({ isMatch:true, confidence:"high", matchedBy:"model", reviewRequired:false });
   }
   if (exactIdentityMatch(first, second, "mpn")) {
-    return { isMatch:true, confidence:"high", matchedBy:"mpn", reviewRequired:false };
+    return finish({ isMatch:true, confidence:"high", matchedBy:"mpn", reviewRequired:false });
   }
   if (hasRetailerIdentifierMatch(first, second)) {
-    return { isMatch:true, confidence:"high", matchedBy:"retailer-id", reviewRequired:false };
+    return finish({ isMatch:true, confidence:"high", matchedBy:"retailer-id", reviewRequired:false });
   }
 
   const firstModel = normalizeModelIdentifier(identityValue(first, "modelNumber"));
   const secondModel = normalizeModelIdentifier(identityValue(second, "modelNumber"));
   if (firstModel && secondModel && firstModel !== secondModel) {
-    return { isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true };
+    return finish({ isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true });
   }
 
   const brandMatches = exactIdentityMatch(first, second, "brand", normalizeIdentityText);
   if (brandMatches && modelMatches) {
-    return { isMatch:true, confidence:"medium", matchedBy:"model", reviewRequired:true };
+    return finish({ isMatch:true, confidence:"medium", matchedBy:"model", reviewRequired:true });
   }
 
   if (productNameSimilarity(first.name, second.name) >= 0.6) {
-    return { isMatch:false, confidence:"low", matchedBy:"name-fallback", reviewRequired:true };
+    return finish({ isMatch:false, confidence:"low", matchedBy:"name-fallback", reviewRequired:true });
   }
-  return { isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true };
+  return finish({ isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true });
 }
 
 function runDevelopmentMatchingTests() {
   const source = products[0];
+  const consoleProduct = products.find(product => product.id === "ps5-slim");
+  const televisionRecord = { name:"Sample TV", specifications:{ screenSize:"55-inch" }, variants:[{ isDefaultVariant:true, size:"55-inch" }] };
+  const laptopRecord = products.find(product => product.id === "macbook-air");
   const withoutStrongIdentifiers = { ...source, retailerIdentifiers:{}, identity:{ ...source.identity, upc:null, gtin:null, mpn:null, manufacturer:null } };
   const results = {
     sameUpcAndModel: compareProductIdentity(source, { ...source, id:"development-copy" }),
@@ -131,13 +177,27 @@ function runDevelopmentMatchingTests() {
     similarNameOnly: compareProductIdentity(
       { ...withoutStrongIdentifiers, brand:null, identity:{ ...withoutStrongIdentifiers.identity, brand:null, modelNumber:null }, name:"20V MAX Cordless Drill Kit" },
       { ...withoutStrongIdentifiers, brand:null, identity:{ ...withoutStrongIdentifiers.identity, brand:null, modelNumber:null }, name:"20V Max Cordless Drill Kit Bundle" }
-    )
+    ),
+    sameConfiguration: compareVariantCompatibility(source, { ...source, id:"same-configuration" }),
+    toolOnlyVsKit: compareVariantCompatibility(source, { ...source, specifications:{ ...source.specifications, toolOnly:true }, variants:[] }),
+    consoleStorageConflict: compareVariantCompatibility(consoleProduct, { ...consoleProduct, specifications:{ ...consoleProduct.specifications, storage:"64 GB" }, variants:[] }),
+    televisionSizeConflict: compareVariantCompatibility(televisionRecord, { ...televisionRecord, specifications:{ screenSize:"65 inch" }, variants:[] }),
+    laptopConfigurationConflict: compareVariantCompatibility(laptopRecord, { ...laptopRecord, specifications:{ ...laptopRecord.specifications, memory:"16 GB", storage:"512 GB SSD" }, variants:[] }),
+    formattedVoltage: normalizeVariantValue("20V MAX") === normalizeVariantValue("20 V MAX"),
+    conflictingVariantRejectsIdentity: compareProductIdentity(source, { ...source, specifications:{ ...source.specifications, toolOnly:true }, variants:[] })
   };
 
   console.assert(results.sameUpcAndModel.isMatch && results.sameUpcAndModel.confidence === "high", "Matching test failed: exact UPC/model");
   console.assert(results.formattedBrandModel.isMatch && results.formattedBrandModel.matchedBy === "model", "Matching test failed: normalized brand/model");
   console.assert(!results.differentModel.isMatch, "Matching test failed: different models must not match");
   console.assert(!results.similarNameOnly.isMatch && results.similarNameOnly.confidence === "low", "Matching test failed: name similarity is only a candidate signal");
+  console.assert(results.sameConfiguration.compatible, "Variant test failed: identical configurations must be compatible");
+  console.assert(!results.toolOnlyVsKit.compatible && results.toolOnlyVsKit.conflicts.includes("toolOnly"), "Variant test failed: tool-only and kit must conflict");
+  console.assert(!results.consoleStorageConflict.compatible && results.consoleStorageConflict.conflicts.includes("storage"), "Variant test failed: console storage must conflict");
+  console.assert(!results.televisionSizeConflict.compatible && results.televisionSizeConflict.conflicts.includes("screenSize"), "Variant test failed: television size must conflict");
+  console.assert(!results.laptopConfigurationConflict.compatible && results.laptopConfigurationConflict.conflicts.includes("memory") && results.laptopConfigurationConflict.conflicts.includes("storage"), "Variant test failed: laptop memory/storage must conflict");
+  console.assert(results.formattedVoltage, "Variant test failed: formatted voltage values must normalize equally");
+  console.assert(!results.conflictingVariantRejectsIdentity.isMatch && results.conflictingVariantRejectsIdentity.reviewRequired, "Matching test failed: strong identity must not override a variant conflict");
   return results;
 }
 
@@ -146,7 +206,9 @@ window.PriceAlertMatching = Object.freeze({
   normalizeTradeIdentifier,
   normalizeModelIdentifier,
   normalizeIdentityText,
+  normalizeVariantValue,
   productNameSimilarity,
+  compareVariantCompatibility,
   compareProductIdentity,
   developmentMatchingTestResults
 });

@@ -6,6 +6,27 @@
   const DATA_STATUS = "sample-development";
   const DEFAULT_CURRENCY = "USD";
 
+  // Flexible, human-readable development specifications. New retailer fields can
+  // be added here without requiring category-specific application logic.
+  const PRODUCT_SPECIFICATIONS = {
+    "dewalt-drill": { voltage:"20V MAX", batteryIncluded:true, batteryCount:2, batteryCapacity:"1.3 Ah", chargerIncluded:true, toolOnly:false, chuckSize:"1/2 in", speed:"0–1,500 RPM", bundleContents:["Drill/driver", "2 batteries", "Charger", "Carrying bag"] },
+    "milwaukee-impact": { voltage:"18V", batteryIncluded:true, batteryCount:1, chargerIncluded:true, toolOnly:false, driveSize:"1/4 in hex", brushless:true, speed:"0–3,400 RPM", bundleContents:["Impact driver", "Battery", "Charger", "Tool bag"] },
+    "airpods-pro": { connectivity:"Bluetooth", color:"White", bundleContents:["Earbuds", "USB-C charging case", "Ear tips", "USB-C cable"] },
+    "sony-headphones": { connectivity:"Bluetooth / 3.5 mm", color:"Black" },
+    "nest-thermostat": { connectivity:"Wi-Fi / Bluetooth", color:"Polished silver" },
+    "ring-doorbell": { resolution:"1536p HD+", connectivity:"Wi-Fi", color:"Satin nickel", batteryIncluded:true },
+    "jump-starter": { capacity:"1000 A peak", batteryIncluded:true, color:"Black" },
+    "dash-cam": { resolution:"1080p", connectivity:"Wi-Fi / Bluetooth", color:"Black" },
+    "ninja-air-fryer": { capacity:"10 qt", dimensions:"18.94 × 15.39 × 12.8 in", color:"Black / stainless steel", power:"1,690 W" },
+    "dyson-vacuum": { capacity:"0.14 gal", dimensions:"49.45 × 9.84 × 8.7 in", color:"Silver / red", power:"Battery powered" },
+    "macbook-air": { processor:"Apple M3", memory:"8 GB", storage:"256 GB SSD", screenSize:"13.6 in", operatingSystem:"macOS", color:"Midnight" },
+    "logitech-mouse": { connectivity:"Bluetooth / Logi Bolt", color:"Graphite" },
+    "ps5-slim": { platform:"PlayStation 5", edition:"Disc Edition", storage:"1 TB", color:"White", bundleContents:["Console", "DualSense controller", "Horizontal stand feet", "Cables"] },
+    "switch-oled": { platform:"Nintendo Switch", edition:"OLED Model", storage:"64 GB", screenSize:"7 in", color:"White", bundleContents:["Console", "White Joy-Con pair", "Dock", "Grip", "Cables"] },
+    "weber-grill": { size:"Three burner", fuelType:"Liquid propane", material:"Porcelain-enameled steel", color:"Black" },
+    "yeti-cooler": { size:"Tundra 45", capacity:"35 qt", material:"Rotomolded polyethylene", color:"White" }
+  };
+
   function createOffer(retailer, price, availability, shipping, regularPrice) {
     return {
       retailer,
@@ -24,8 +45,11 @@
   }
 
   function createProduct(config) {
+    const categorySpecifications = PRODUCT_SPECIFICATIONS[config.id] || {};
+    const variantId = `${config.id}-default`;
     return {
       id: config.id,
+      familyId: config.familyId || config.id,
       slug: config.slug || config.id,
       brand: config.brand,
       name: config.name,
@@ -67,8 +91,26 @@
       specifications: {
         itemNumber: config.itemNumber,
         upc: config.upc,
-        visualMark: config.visualMark
+        visualMark: config.visualMark,
+        ...categorySpecifications
       },
+      variants: [{
+        variantId,
+        variantName: config.variantName || "Default sample configuration",
+        color: categorySpecifications.color || null,
+        size: categorySpecifications.size || categorySpecifications.screenSize || null,
+        capacity: categorySpecifications.capacity || null,
+        storage: categorySpecifications.storage || null,
+        configuration: config.variantConfiguration || null,
+        bundleContents: categorySpecifications.bundleContents || [],
+        modelNumber: config.modelNumber,
+        mpn: null,
+        upc: config.upc,
+        gtin: null,
+        sku: null,
+        isDefaultVariant: true,
+        variantStatus: "sample-development"
+      }],
       offers: config.offers.map(offer => createOffer(...offer, config.regularPrice)),
       priceHistory: config.priceHistory.map((price, index) => ({
         recordedAt: null,
@@ -114,7 +156,7 @@
   const retailers = ["Lowe's", "Home Depot", "Walmart", "Best Buy", "eBay", "Amazon"];
 
   window.PriceAlertData = Object.freeze({
-    schemaVersion: "1.2.0",
+    schemaVersion: "1.3.0",
     dataStatus: DATA_STATUS,
     products,
     categories,
