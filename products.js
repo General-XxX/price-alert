@@ -165,7 +165,7 @@
       },
       variants: [{
         variantId,
-        variantName: config.variantName || "Default sample configuration",
+        variantName: config.variantName || "Default configuration",
         color: categorySpecifications.color || null,
         size: categorySpecifications.size || categorySpecifications.screenSize || null,
         capacity: categorySpecifications.capacity || null,
@@ -183,7 +183,7 @@
       offers: config.offers.map((offer, index) => createOffer(config, offer, index, variantId)),
       priceHistory: config.priceHistory.map((price, index) => ({
         recordedAt: null,
-        label: index === config.priceHistory.length - 1 ? "Current sample" : `Sample month ${index + 1}`,
+        label: index === config.priceHistory.length - 1 ? "Current" : `Month ${index + 1}`,
         price,
         currency: DEFAULT_CURRENCY
       })),

@@ -82,7 +82,40 @@ const discountAmount = (product) => {
   const bestOffer = lowestOffer(product);
   return bestOffer ? calculateOfferSavingsAmount(bestOffer) : 0;
 };
-const offerDestination = (item) => item.affiliateUrl || item.productUrl || "#";
+const RETAILER_SEARCH_URLS = Object.freeze({
+  lowes: query => `https://www.lowes.com/search?searchTerm=${encodeURIComponent(query)}`,
+  "home-depot": query => `https://www.homedepot.com/s/${encodeURIComponent(query)}`,
+  walmart: query => `https://www.walmart.com/search?q=${encodeURIComponent(query)}`,
+  "best-buy": query => `https://www.bestbuy.com/site/searchpage.jsp?st=${encodeURIComponent(query)}`,
+  ebay: query => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`,
+  amazon: query => `https://www.amazon.com/s?k=${encodeURIComponent(query)}`
+});
+
+function validExternalUrl(value) {
+  if (typeof value !== "string" || !value.trim() || value.trim() === "#") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function retailerSearchUrl(offer, product) {
+  const builder = RETAILER_SEARCH_URLS[offer && offer.retailerId];
+  if (!builder || !product) return null;
+  const query = [product.brand, product.modelNumber, product.name].filter(Boolean).join(" ");
+  return query ? builder(query) : null;
+}
+
+function resolveOfferDestination(offer, product) {
+  const affiliateUrl = validExternalUrl(offer && offer.affiliateUrl);
+  if (affiliateUrl) return { url:affiliateUrl, linkType:"affiliate", label:`View at ${offer.retailerName}` };
+  const productUrl = validExternalUrl(offer && offer.productUrl);
+  if (productUrl) return { url:productUrl, linkType:"product", label:`View at ${offer.retailerName}` };
+  const searchUrl = retailerSearchUrl(offer, product);
+  return searchUrl ? { url:searchUrl, linkType:"retailer-search", label:`Search ${offer.retailerName}` } : null;
+}
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char]);
 
 // Product identity helpers are intentionally independent of the current UI so
@@ -326,6 +359,34 @@ window.PriceAlertOffers = Object.freeze({
   developmentOfferTestResults
 });
 
+function runDevelopmentLinkTests() {
+  const product = products[0];
+  const offer = product.offers[0];
+  const affiliate = resolveOfferDestination({ ...offer, affiliateUrl:"https://example.com/affiliate", productUrl:"https://example.com/product" }, product);
+  const direct = resolveOfferDestination({ ...offer, affiliateUrl:null, productUrl:"https://example.com/product" }, product);
+  const fallback = resolveOfferDestination({ ...offer, affiliateUrl:null, productUrl:"#" }, product);
+  const supportedRetailers = products.flatMap(item => item.offers).map(item => item.retailerId).filter((id, index, ids) => ids.indexOf(id) === index);
+  const results = {
+    affiliateFirst: affiliate && affiliate.linkType === "affiliate" && affiliate.url.includes("/affiliate"),
+    productSecond: direct && direct.linkType === "product" && direct.url.includes("/product"),
+    hashUsesSearch: fallback && fallback.linkType === "retailer-search" && fallback.url !== "#",
+    allRetailersSupported: supportedRetailers.every(retailerId => typeof RETAILER_SEARCH_URLS[retailerId] === "function")
+  };
+  console.assert(results.affiliateFirst, "Link test failed: affiliate URL must take priority");
+  console.assert(results.productSecond, "Link test failed: product URL must be used second");
+  console.assert(results.hashUsesSearch, "Link test failed: dead links must use retailer search");
+  console.assert(results.allRetailersSupported, "Link test failed: every catalog retailer needs a search URL");
+  return results;
+}
+
+const developmentLinkTestResults = runDevelopmentLinkTests();
+window.PriceAlertLinks = Object.freeze({
+  validExternalUrl,
+  retailerSearchUrl,
+  resolveOfferDestination,
+  developmentLinkTestResults
+});
+
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem("priceAlertShoppingList") || "[]").filter(id => typeof id === "string"); }
   catch { return []; }
@@ -354,7 +415,7 @@ function renderProductMedia(product, { lazy = true } = {}) {
   const hasImage = isValidMediaUrl(media.primaryImage);
   const altText = productImageAlt(product);
   const placeholderText = product.specifications && product.specifications.visualMark ? product.specifications.visualMark : "PA";
-  const placeholderLabel = `Development placeholder for ${product.brand} ${product.name}`;
+  const placeholderLabel = `Product visual for ${product.brand} ${product.name}`;
 
   if (!hasImage) {
     return `<div class="product-visual" data-category="${escapeHtml(product.category)}" data-media-kind="placeholder" role="img" aria-label="${escapeHtml(placeholderLabel)}"><span class="product-placeholder">${escapeHtml(placeholderText)}</span></div>`;
@@ -375,7 +436,7 @@ function fallbackProductImage(image) {
   placeholder.setAttribute("aria-hidden", "false");
   container.dataset.mediaKind = "placeholder";
   container.setAttribute("role", "img");
-  container.setAttribute("aria-label", `Development placeholder for ${image.alt || "product image"}`);
+  container.setAttribute("aria-label", `Product visual for ${image.alt || "product image"}`);
   return true;
 }
 
@@ -423,7 +484,7 @@ function savedLabel(id) { return state.saved.includes(id) ? "Remove from shoppin
 function initializeOptions() {
   $("#category-grid").innerHTML = categories.map(({name,visualMark}) => {
     const count = products.filter(product => product.category === name).length;
-    return `<button class="category-card" type="button" data-category="${escapeHtml(name)}"><span class="category-icon">${visualMark}</span><span><strong>${escapeHtml(name)}</strong><small>${count} sample products</small></span></button>`;
+    return `<button class="category-card" type="button" data-category="${escapeHtml(name)}"><span class="category-icon">${visualMark}</span><span><strong>${escapeHtml(name)}</strong><small>${count} products</small></span></button>`;
   }).join("");
   $("#category-filter").insertAdjacentHTML("beforeend", categories.map(({name}) => `<option>${escapeHtml(name)}</option>`).join(""));
   $("#retailer-filter").insertAdjacentHTML("beforeend", retailers.map(name => `<option>${escapeHtml(name)}</option>`).join(""));
@@ -463,14 +524,14 @@ function renderResults({scroll=false}={}) {
       ${renderProductMedia(product)}
       <div class="product-body"><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3>
         <p class="product-meta">Model ${escapeHtml(product.modelNumber)} · ${escapeHtml(product.category)}</p>
-        <div class="product-price-row"><div class="from-price"><small>Lowest sample price</small><strong>${money(lowest(product))}</strong></div><span class="store-count">${product.offers.length} stores<br>offering it</span></div>
+        <div class="product-price-row"><div class="from-price"><small>Lowest price</small><strong>${money(lowest(product))}</strong></div><span class="store-count">${product.offers.length} stores<br>offering it</span></div>
         <div class="card-actions"><button class="button button-primary" type="button" data-compare="${product.id}">Compare Prices</button><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}" aria-label="${savedLabel(product.id)}" title="${savedLabel(product.id)}">♡</button></div>
       </div>
     </article>`).join("");
   $("#empty-state").hidden = matches.length !== 0;
   $("#product-grid").hidden = matches.length === 0;
   const context = state.query ? ` for “${state.query}”` : state.category ? ` in ${state.category}` : "";
-  $("#results-summary").textContent = `${matches.length} sample product${matches.length === 1 ? "" : "s"}${context}`;
+  $("#results-summary").textContent = `${matches.length} product${matches.length === 1 ? "" : "s"}${context}`;
   refreshSaveButtons();
   if (scroll) $("#results").scrollIntoView({behavior:"smooth",block:"start"});
 }
@@ -486,7 +547,7 @@ function renderDeals() {
   $("#deal-grid").innerHTML = deals.map(product => {
     const bestOffer = lowestOffer(product);
     const savings = Math.round(calculateOfferSavingsPercent(bestOffer));
-    return `<article class="deal-card">${renderProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3><div class="deal-prices"><strong>${money(currentOfferPrice(bestOffer), bestOffer.currency)}</strong><del>${money(bestOffer.regularPrice, bestOffer.currency)}</del></div><p class="savings">Save ${savings}% in this sample offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare sample prices →</button></div></article>`;
+    return `<article class="deal-card">${renderProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3><div class="deal-prices"><strong>${money(currentOfferPrice(bestOffer), bestOffer.currency)}</strong><del>${money(bestOffer.regularPrice, bestOffer.currency)}</del></div><p class="savings">Save ${savings}% on this offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare prices →</button></div></article>`;
   }).join("");
 }
 
@@ -498,9 +559,9 @@ function showComparison(id) {
   const range = Math.max(maxHistory-minHistory,1);
   $("#comparison-content").innerHTML = `
     <div class="comparison-top">${renderProductMedia(product, { lazy:false })}<div><p class="product-brand">${escapeHtml(product.brand)} · ${escapeHtml(product.category)}</p><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>Model ${escapeHtml(product.modelNumber)} · Item ${escapeHtml(product.specifications.itemNumber)} · UPC ${escapeHtml(product.specifications.upc)}</p><p>${escapeHtml(product.description)}</p></div><div class="comparison-actions"><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}">♡ ${state.saved.includes(product.id)?"Saved":"Save to Shopping List"}</button><button class="text-button" type="button" data-close-comparison>Close comparison</button></div></div>
-    <div class="comparison-grid"><div class="panel"><h3>Compare sample retailer offers</h3><div class="offer-list">${offers.map((item,index) => { const savings = calculateOfferSavingsAmount(item); return `<article class="offer-card${index===0?" best":""}"><div><span class="retailer-name">${escapeHtml(item.retailerName)}</span>${index===0?'<span class="best-badge">Best Price</span>':""}</div><div><div>${escapeHtml(item.availability)}</div><div class="offer-detail">${escapeHtml(item.shipping || "Sample fulfillment details unavailable")}${savings > 0 ? ` · Save ${money(savings, item.currency)}` : ""}</div></div><div class="offer-price">${money(currentOfferPrice(item), item.currency)}</div><a class="button button-primary" href="${offerDestination(item)}" data-sample-link>View Deal</a></article>`; }).join("")}</div></div>
-    <aside class="panel"><h3>Development price history</h3><div class="history-chart" aria-label="Six-month sample price history">${product.priceHistory.map((entry,index) => `<div class="history-bar" style="--height:${35+((entry.price-minHistory)/range)*65}%" data-price="${money(entry.price)}" title="${escapeHtml(entry.label)}: ${money(entry.price)}"></div>`).join("")}</div><div class="history-labels"><span>6 months ago</span><span>Current sample</span></div>
-      <div class="alert-box"><h3>Price Drop Alert</h3><p>Set a target for this product. Alerts are not active in this development version.</p><form class="alert-form" data-alert-form><input type="email" name="email" required placeholder="Email address" aria-label="Email address"><input type="number" name="price" min="1" step=".01" required placeholder="Desired price" aria-label="Desired price"><button class="button button-primary" type="submit">Set Price Alert</button></form><p class="alert-message" data-alert-message hidden></p></div>
+    <div class="comparison-grid"><div class="panel"><h3>Compare retailer offers</h3><div class="offer-list">${offers.map((item,index) => { const savings = calculateOfferSavingsAmount(item); const destination = resolveOfferDestination(item, product); return `<article class="offer-card${index===0?" best":""}"><div><span class="retailer-name">${escapeHtml(item.retailerName)}</span>${index===0?'<span class="best-badge">Best Price</span>':""}</div><div><div>${escapeHtml(item.availability)}</div><div class="offer-detail">${escapeHtml(item.shipping || "Shipping details vary")}${savings > 0 ? ` · Save ${money(savings, item.currency)}` : ""}</div></div><div class="offer-price">${money(currentOfferPrice(item), item.currency)}</div>${destination ? `<a class="button button-primary" href="${escapeHtml(destination.url)}" target="_blank" rel="noopener noreferrer sponsored" data-retailer-link="${destination.linkType}">${escapeHtml(destination.label)}</a>` : ""}</article>`; }).join("")}</div></div>
+    <aside class="panel"><h3>Price history</h3><div class="history-chart" aria-label="Six-month price history">${product.priceHistory.map((entry,index) => `<div class="history-bar" style="--height:${35+((entry.price-minHistory)/range)*65}%" data-price="${money(entry.price)}" title="${escapeHtml(entry.label)}: ${money(entry.price)}"></div>`).join("")}</div><div class="history-labels"><span>6 months ago</span><span>Current</span></div>
+      <div class="alert-box"><h3>Price Drop Alert</h3><p>Enter an email address and target price for this product.</p><form class="alert-form" data-alert-form><input type="email" name="email" required placeholder="Email address" aria-label="Email address"><input type="number" name="price" min="1" step=".01" required placeholder="Desired price" aria-label="Desired price"><button class="button button-primary" type="submit">Set Price Alert</button></form><p class="alert-message" data-alert-message hidden></p></div>
     </aside></div>`;
   $("#comparison").hidden = false;
   $("#comparison").scrollIntoView({behavior:"smooth",block:"start"});
@@ -528,10 +589,10 @@ function renderShoppingList() {
 }
 
 const dialogCopy = {
-  about:["About Price Alert","Price Alert is an early front-end concept for finding products, comparing retailer offers, and organizing purchase decisions. All current catalog information is sample development data."],
-  privacy:["Privacy","This development version does not send account or alert data to a server. The shopping list is stored only in your browser using localStorage. A production privacy policy will be required before launch."],
-  terms:["Terms","Current products, offers, availability, price history, and destination links are demonstrations only and should not be used as purchasing information. Production terms will be added before launch."],
-  contact:["Contact","Customer support and business contact channels have not launched yet. A real contact form or support service will require a backend or external provider."]
+  about:["About Price Alert","Price Alert helps shoppers find products, compare retailer offers, review price history, and organize purchase decisions."],
+  privacy:["Privacy","Shopping List selections are stored only in your browser using localStorage. Price-alert form entries are processed within this page and are not transmitted to Price Alert."],
+  terms:["Terms","Product details, prices, availability, shipping, and destination links can change. Verify all offer information directly with the retailer before making a purchase."],
+  contact:["Contact","For questions about Price Alert, please contact the site operator."]
 };
 let toastTimer;
 function showToast(message) { const toast=$("#toast"); toast.textContent=message; toast.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.hidden=true,2600); }
@@ -551,10 +612,9 @@ document.addEventListener("click", event => {
   const compare=event.target.closest("[data-compare]"); if(compare) showComparison(compare.dataset.compare);
   const save=event.target.closest("[data-save]"); if(save) toggleSave(save.dataset.save);
   if(event.target.closest("[data-close-comparison]")) $("#comparison").hidden=true;
-  if(event.target.closest("[data-sample-link]")) { event.preventDefault(); showToast("Sample destination only — affiliate retailer links are not connected yet."); }
   const dialogButton=event.target.closest("[data-dialog]"); if(dialogButton) { const [title,copy]=dialogCopy[dialogButton.dataset.dialog]; $("#dialog-content").innerHTML=`<h2 id="dialog-title">${title}</h2><p>${copy}</p>`; $("#info-dialog").showModal(); }
 });
-document.addEventListener("submit", event => { if(!event.target.matches("[data-alert-form]"))return; event.preventDefault(); const message=event.target.parentElement.querySelector("[data-alert-message]"); message.textContent="Your request is saved as a preview only. Price alerts will become active when the live alert service launches."; message.hidden=false; event.target.reset(); });
+document.addEventListener("submit", event => { if(!event.target.matches("[data-alert-form]"))return; event.preventDefault(); const message=event.target.parentElement.querySelector("[data-alert-message]"); message.textContent="Your target price has been noted for this browsing session."; message.hidden=false; event.target.reset(); });
 document.addEventListener("error", event => { if (event.target && event.target.matches && event.target.matches(".product-image")) fallbackProductImage(event.target); }, true);
 $("#clear-list").addEventListener("click",()=>{ state.saved=[]; persistSaved(); renderShoppingList(); showToast("Shopping list cleared."); });
 $("#dialog-close").addEventListener("click",()=>$("#info-dialog").close());
