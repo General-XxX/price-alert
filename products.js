@@ -32,7 +32,18 @@
       modelNumber: config.modelNumber,
       category: config.category,
       description: config.description,
-      image: null,
+      media: {
+        primaryImage: null,
+        galleryImages: [],
+        thumbnail: null,
+        imageAlt: `${config.brand} ${config.name}`,
+        imageSource: null,
+        imageSourceType: "placeholder",
+        imageLicenseOrPermission: "development-placeholder",
+        imageLastUpdated: null,
+        videoUrl: null,
+        mediaStatus: "sample-placeholder"
+      },
       identity: {
         brand: config.brand,
         manufacturer: null,
@@ -103,7 +114,7 @@
   const retailers = ["Lowe's", "Home Depot", "Walmart", "Best Buy", "eBay", "Amazon"];
 
   window.PriceAlertData = Object.freeze({
-    schemaVersion: "1.1.0",
+    schemaVersion: "1.2.0",
     dataStatus: DATA_STATUS,
     products,
     categories,

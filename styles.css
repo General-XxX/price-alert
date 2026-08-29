@@ -96,6 +96,9 @@ a { color: inherit; }
 .product-card { background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; display: grid; grid-template-columns: 140px minmax(0,1fr); box-shadow: 0 8px 25px rgba(20,33,61,.05); }
 .product-visual { min-height: 215px; display: grid; place-items: center; background: linear-gradient(145deg,#f8fafc,#eaf1fa); color: var(--blue); font-size: 2rem; font-weight: 900; letter-spacing: -.06em; position: relative; }
 .product-visual::after { content: attr(data-category); position: absolute; bottom: 12px; font-size: .62rem; color: #6d7b91; letter-spacing: .08em; text-transform: uppercase; }
+.product-visual[data-media-kind="image"] { background: white; }
+.product-image { position: absolute; inset: 0; width: 100%; height: 100%; padding: 18px; display: block; object-fit: contain; object-position: center; }
+.product-placeholder { position: relative; z-index: 1; }
 .product-body { padding: 20px; min-width: 0; }
 .product-brand { color: var(--blue); font-size: .72rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
 .product-body h3 { font-size: 1.05rem; line-height: 1.3; margin: 6px 0 5px; }
@@ -114,6 +117,7 @@ a { color: inherit; }
 .comparison-section { background: white; border-block: 1px solid var(--gray-200); }
 .comparison-top { display: grid; grid-template-columns: 180px minmax(0,1fr) auto; gap: 28px; align-items: center; margin-bottom: 34px; }
 .comparison-top .product-visual { min-height: 160px; border-radius: var(--radius); }
+.comparison-top .product-image { padding: 22px; }
 .comparison-top h2 { font-size: clamp(1.65rem,4vw,2.4rem); line-height: 1.15; margin: 6px 0; }
 .comparison-top p { color: var(--gray-500); }
 .comparison-actions { display: flex; flex-direction: column; gap: 10px; }
@@ -142,6 +146,7 @@ a { color: inherit; }
 .deal-card { background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 22px; display: flex; gap: 18px; align-items: center; }
 .deal-card .product-visual { min-height: 105px; width: 105px; flex: 0 0 105px; border-radius: 12px; }
 .deal-card .product-visual::after { display: none; }
+.deal-card .product-image { padding: 12px; }
 .deal-card h3 { font-size: .96rem; line-height: 1.25; margin: 4px 0 10px; }
 .deal-prices { display: flex; align-items: baseline; gap: 8px; }
 .deal-prices strong { color: var(--blue); font-size: 1.25rem; }

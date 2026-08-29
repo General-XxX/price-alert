@@ -158,7 +158,90 @@ function loadSaved() {
 function persistSaved() {
   try { localStorage.setItem("priceAlertShoppingList", JSON.stringify(state.saved)); } catch {}
 }
-function productVisual(product) { return `<div class="product-visual" data-category="${escapeHtml(product.category)}" role="img" aria-label="Sample visual placeholder for ${escapeHtml(product.name)}">${escapeHtml(product.specifications.visualMark)}</div>`; }
+
+function isValidMediaUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const parsed = new URL(value, document.baseURI);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function productImageAlt(product) {
+  const configuredAlt = product.media && product.media.imageAlt;
+  return configuredAlt && configuredAlt.trim() ? configuredAlt.trim() : `${product.brand} ${product.name} product image`;
+}
+
+function renderProductMedia(product, { lazy = true } = {}) {
+  const media = product.media || {};
+  const hasImage = isValidMediaUrl(media.primaryImage);
+  const altText = productImageAlt(product);
+  const placeholderText = product.specifications && product.specifications.visualMark ? product.specifications.visualMark : "PA";
+  const placeholderLabel = `Development placeholder for ${product.brand} ${product.name}`;
+
+  if (!hasImage) {
+    return `<div class="product-visual" data-category="${escapeHtml(product.category)}" data-media-kind="placeholder" role="img" aria-label="${escapeHtml(placeholderLabel)}"><span class="product-placeholder">${escapeHtml(placeholderText)}</span></div>`;
+  }
+
+  return `<div class="product-visual" data-category="${escapeHtml(product.category)}" data-media-kind="image"><img class="product-image" src="${escapeHtml(media.primaryImage)}" alt="${escapeHtml(altText)}" loading="${lazy ? "lazy" : "eager"}" decoding="async"><span class="product-placeholder" aria-hidden="true" hidden>${escapeHtml(placeholderText)}</span></div>`;
+}
+
+function fallbackProductImage(image) {
+  if (!image || !image.matches || !image.matches(".product-image")) return false;
+  const container = image.closest(".product-visual");
+  const placeholder = container && container.querySelector(".product-placeholder");
+  if (!container || !placeholder) return false;
+
+  image.hidden = true;
+  image.removeAttribute("src");
+  placeholder.hidden = false;
+  placeholder.setAttribute("aria-hidden", "false");
+  container.dataset.mediaKind = "placeholder";
+  container.setAttribute("role", "img");
+  container.setAttribute("aria-label", `Development placeholder for ${image.alt || "product image"}`);
+  return true;
+}
+
+function runDevelopmentMediaTests() {
+  const sampleProduct = products[0];
+  const syntheticImageUrl = "https://example.invalid/authorized-sample.png";
+  const placeholderMarkup = renderProductMedia(sampleProduct);
+  const futureImageProduct = {
+    ...sampleProduct,
+    media: { ...sampleProduct.media, primaryImage: syntheticImageUrl, imageAlt:"Authorized sample product image", mediaStatus:"authorized" }
+  };
+  const imageMarkup = renderProductMedia(futureImageProduct);
+  const testContainer = document.createElement("div");
+  testContainer.innerHTML = imageMarkup.replace(` src="${syntheticImageUrl}"`, "");
+  const testImage = testContainer.querySelector(".product-image");
+  const fallbackApplied = fallbackProductImage(testImage);
+  const testPlaceholder = testContainer.querySelector(".product-placeholder");
+  const fallbackVisible = Boolean(testPlaceholder && !testPlaceholder.hidden);
+  const results = {
+    noImageUsesPlaceholder: placeholderMarkup.includes('data-media-kind="placeholder"'),
+    primaryImageRendersImage: imageMarkup.includes('class="product-image"') && imageMarkup.includes('loading="lazy"'),
+    failedImageUsesPlaceholder: Boolean(fallbackApplied && fallbackVisible && testImage && testImage.hidden),
+    imageAltPresent: Boolean(testImage && testImage.alt)
+  };
+
+  console.assert(results.noImageUsesPlaceholder, "Media test failed: missing image must use placeholder");
+  console.assert(results.primaryImageRendersImage, "Media test failed: primary image must render responsively");
+  console.assert(results.failedImageUsesPlaceholder, "Media test failed: broken image must fall back");
+  console.assert(results.imageAltPresent, "Media test failed: product image must have alt text");
+  return results;
+}
+
+const developmentMediaTestResults = runDevelopmentMediaTests();
+window.PriceAlertMedia = Object.freeze({
+  isValidMediaUrl,
+  productImageAlt,
+  renderProductMedia,
+  fallbackProductImage,
+  developmentMediaTestResults
+});
+
 function savedClass(id) { return state.saved.includes(id) ? " saved" : ""; }
 function savedLabel(id) { return state.saved.includes(id) ? "Remove from shopping list" : "Save to shopping list"; }
 
@@ -200,7 +283,7 @@ function renderResults({scroll=false}={}) {
   $("#results").hidden = false;
   $("#product-grid").innerHTML = matches.map(product => `
     <article class="product-card">
-      ${productVisual(product)}
+      ${renderProductMedia(product)}
       <div class="product-body"><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3>
         <p class="product-meta">Model ${escapeHtml(product.modelNumber)} · ${escapeHtml(product.category)}</p>
         <div class="product-price-row"><div class="from-price"><small>Lowest sample price</small><strong>${money(lowest(product))}</strong></div><span class="store-count">${product.offers.length} stores<br>offering it</span></div>
@@ -226,7 +309,7 @@ function renderDeals() {
   $("#deal-grid").innerHTML = deals.map(product => {
     const bestOffer = lowestOffer(product);
     const savings = Math.round((1-bestOffer.price/bestOffer.regularPrice)*100);
-    return `<article class="deal-card">${productVisual(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3><div class="deal-prices"><strong>${money(bestOffer.price)}</strong><del>${money(bestOffer.regularPrice)}</del></div><p class="savings">Save ${savings}% in this sample offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare sample prices →</button></div></article>`;
+    return `<article class="deal-card">${renderProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3><div class="deal-prices"><strong>${money(bestOffer.price)}</strong><del>${money(bestOffer.regularPrice)}</del></div><p class="savings">Save ${savings}% in this sample offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare sample prices →</button></div></article>`;
   }).join("");
 }
 
@@ -237,7 +320,7 @@ function showComparison(id) {
   const minHistory = Math.min(...historyPrices), maxHistory = Math.max(...historyPrices);
   const range = Math.max(maxHistory-minHistory,1);
   $("#comparison-content").innerHTML = `
-    <div class="comparison-top">${productVisual(product)}<div><p class="product-brand">${escapeHtml(product.brand)} · ${escapeHtml(product.category)}</p><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>Model ${escapeHtml(product.modelNumber)} · Item ${escapeHtml(product.specifications.itemNumber)} · UPC ${escapeHtml(product.specifications.upc)}</p><p>${escapeHtml(product.description)}</p></div><div class="comparison-actions"><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}">♡ ${state.saved.includes(product.id)?"Saved":"Save to Shopping List"}</button><button class="text-button" type="button" data-close-comparison>Close comparison</button></div></div>
+    <div class="comparison-top">${renderProductMedia(product, { lazy:false })}<div><p class="product-brand">${escapeHtml(product.brand)} · ${escapeHtml(product.category)}</p><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>Model ${escapeHtml(product.modelNumber)} · Item ${escapeHtml(product.specifications.itemNumber)} · UPC ${escapeHtml(product.specifications.upc)}</p><p>${escapeHtml(product.description)}</p></div><div class="comparison-actions"><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}">♡ ${state.saved.includes(product.id)?"Saved":"Save to Shopping List"}</button><button class="text-button" type="button" data-close-comparison>Close comparison</button></div></div>
     <div class="comparison-grid"><div class="panel"><h3>Compare sample retailer offers</h3><div class="offer-list">${offers.map((item,index) => `<article class="offer-card${index===0?" best":""}"><div><span class="retailer-name">${escapeHtml(item.retailer)}</span>${index===0?'<span class="best-badge">Best Price</span>':""}</div><div><div>${escapeHtml(item.availability)}</div><div class="offer-detail">${escapeHtml(item.shipping)}</div></div><div class="offer-price">${money(item.price)}</div><a class="button button-primary" href="${offerDestination(item)}" data-sample-link>View Deal</a></article>`).join("")}</div></div>
     <aside class="panel"><h3>Development price history</h3><div class="history-chart" aria-label="Six-month sample price history">${product.priceHistory.map((entry,index) => `<div class="history-bar" style="--height:${35+((entry.price-minHistory)/range)*65}%" data-price="${money(entry.price)}" title="${escapeHtml(entry.label)}: ${money(entry.price)}"></div>`).join("")}</div><div class="history-labels"><span>6 months ago</span><span>Current sample</span></div>
       <div class="alert-box"><h3>Price Drop Alert</h3><p>Set a target for this product. Alerts are not active in this development version.</p><form class="alert-form" data-alert-form><input type="email" name="email" required placeholder="Email address" aria-label="Email address"><input type="number" name="price" min="1" step=".01" required placeholder="Desired price" aria-label="Desired price"><button class="button button-primary" type="submit">Set Price Alert</button></form><p class="alert-message" data-alert-message hidden></p></div>
@@ -295,6 +378,7 @@ document.addEventListener("click", event => {
   const dialogButton=event.target.closest("[data-dialog]"); if(dialogButton) { const [title,copy]=dialogCopy[dialogButton.dataset.dialog]; $("#dialog-content").innerHTML=`<h2 id="dialog-title">${title}</h2><p>${copy}</p>`; $("#info-dialog").showModal(); }
 });
 document.addEventListener("submit", event => { if(!event.target.matches("[data-alert-form]"))return; event.preventDefault(); const message=event.target.parentElement.querySelector("[data-alert-message]"); message.textContent="Your request is saved as a preview only. Price alerts will become active when the live alert service launches."; message.hidden=false; event.target.reset(); });
+document.addEventListener("error", event => { if (event.target && event.target.matches && event.target.matches(".product-image")) fallbackProductImage(event.target); }, true);
 $("#clear-list").addEventListener("click",()=>{ state.saved=[]; persistSaved(); renderShoppingList(); showToast("Shopping list cleared."); });
 $("#dialog-close").addEventListener("click",()=>$("#info-dialog").close());
 $("#info-dialog").addEventListener("click",event=>{ if(event.target===$("#info-dialog")) $("#info-dialog").close(); });
