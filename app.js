@@ -7,15 +7,80 @@ if (!catalog || !Array.isArray(catalog.products) || !Array.isArray(catalog.categ
 
 const products = catalog.products;
 const categories = catalog.categories;
-const retailers = catalog.retailers || [...new Set(products.flatMap(product => product.offers.map(item => item.retailer)))];
+const retailerRecords = catalog.retailers || [];
+const retailers = retailerRecords.length && typeof retailerRecords[0] === "object"
+  ? retailerRecords.map(retailer => retailer.displayName || retailer.name)
+  : retailerRecords;
 const state = { query:"", category:"", retailer:"", min:"", max:"", availability:"", sort:"low", saved:loadSaved() };
 const $ = (selector) => document.querySelector(selector);
-const money = (value) => new Intl.NumberFormat("en-US", { style:"currency", currency:"USD" }).format(value);
-const lowest = (product) => Math.min(...product.offers.map(item => item.price));
-const lowestOffer = (product) => [...product.offers].sort((a,b) => a.price-b.price)[0];
+const money = (value, currency = "USD") => new Intl.NumberFormat("en-US", { style:"currency", currency }).format(value);
+
+function validOfferPrice(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function currentOfferPrice(offer) {
+  const salePrice = validOfferPrice(offer && offer.salePrice);
+  return salePrice !== null ? salePrice : validOfferPrice(offer && offer.price);
+}
+
+function regularAndSalePrice(offer) {
+  const currentPrice = currentOfferPrice(offer);
+  const regularPrice = validOfferPrice(offer && offer.regularPrice);
+  const onSale = currentPrice !== null && regularPrice !== null && regularPrice > currentPrice;
+  return { currentPrice, regularPrice, salePrice:onSale ? currentPrice : null, onSale };
+}
+
+function calculateOfferSavingsAmount(offer) {
+  const prices = regularAndSalePrice(offer);
+  return prices.onSale ? Number((prices.regularPrice - prices.currentPrice).toFixed(2)) : 0;
+}
+
+function calculateOfferSavingsPercent(offer) {
+  const prices = regularAndSalePrice(offer);
+  return prices.onSale && prices.regularPrice > 0 ? Number(((prices.regularPrice - prices.currentPrice) / prices.regularPrice * 100).toFixed(2)) : 0;
+}
+
+function isOfferCompatibleWithProduct(offer, product) {
+  if (!offer || !product) return false;
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  if (offer.variantId && variants.length && !variants.some(variant => variant.variantId === offer.variantId)) return false;
+  if (offer.retailerModelNumber) {
+    const offerModel = normalizeModelIdentifier(offer.retailerModelNumber);
+    const validModels = [product.modelNumber, ...variants.map(variant => variant.modelNumber)].map(normalizeModelIdentifier).filter(Boolean);
+    if (offerModel && validModels.length && !validModels.includes(offerModel)) return false;
+  }
+  return true;
+}
+
+function isOfferCurrentlyAvailable(offer, product = null) {
+  if (!offer || currentOfferPrice(offer) === null || !offer.currency) return false;
+  if (product && !isOfferCompatibleWithProduct(offer, product)) return false;
+  if (["inactive", "invalid", "removed"].includes(String(offer.offerStatus || "").toLowerCase())) return false;
+  if (String(offer.stockStatus || "").toLowerCase() === "out-of-stock") return false;
+  return !/out of stock|unavailable/i.test(offer.availability || "");
+}
+
+function sortOffersByLowestPrice(offers, { product = null, currency = null } = {}) {
+  const available = (Array.isArray(offers) ? offers : []).filter(offer => isOfferCurrentlyAvailable(offer, product));
+  const comparisonCurrency = currency || (available[0] && available[0].currency) || null;
+  return available.filter(offer => offer.currency === comparisonCurrency).map((offer, index) => ({ offer, index })).sort((a, b) => currentOfferPrice(a.offer) - currentOfferPrice(b.offer) || a.index - b.index).map(item => item.offer);
+}
+
+function bestAvailableOffer(product, currency = null) {
+  return sortOffersByLowestPrice(product && product.offers, { product, currency })[0] || null;
+}
+
+const lowestOffer = product => bestAvailableOffer(product);
+const lowest = product => {
+  const offer = lowestOffer(product);
+  return offer ? currentOfferPrice(offer) : null;
+};
 const discountAmount = (product) => {
   const bestOffer = lowestOffer(product);
-  return Math.max(0, (bestOffer.regularPrice || bestOffer.price) - bestOffer.price);
+  return bestOffer ? calculateOfferSavingsAmount(bestOffer) : 0;
 };
 const offerDestination = (item) => item.affiliateUrl || item.productUrl || "#";
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char]);
@@ -213,6 +278,54 @@ window.PriceAlertMatching = Object.freeze({
   developmentMatchingTestResults
 });
 
+function runDevelopmentOfferTests() {
+  const product = products[0];
+  const validOffer = { ...product.offers[0], offerId:"test-valid", price:80, salePrice:80, regularPrice:100, currency:"USD", stockStatus:"in-stock", offerStatus:"sample-active" };
+  const unavailableOffer = { ...validOffer, offerId:"test-unavailable", price:50, salePrice:50, stockStatus:"out-of-stock" };
+  const invalidOffer = { ...validOffer, offerId:"test-invalid", price:"not-a-price", salePrice:null };
+  const missingPriceOffer = { ...validOffer, offerId:"test-missing", price:null, salePrice:null };
+  const duplicateOffer = { ...validOffer };
+  const incompatibleOffer = { ...validOffer, offerId:"test-wrong-variant", variantId:"different-variant", price:20, salePrice:20 };
+  const euroOffer = { ...validOffer, offerId:"test-eur", currency:"EUR", price:10, salePrice:10 };
+  const mixedOffers = [unavailableOffer, invalidOffer, missingPriceOffer, validOffer, duplicateOffer, incompatibleOffer, euroOffer];
+  const sortedUsdOffers = sortOffersByLowestPrice(mixedOffers, { product, currency:"USD" });
+  const results = {
+    lowestValidAvailable: bestAvailableOffer({ ...product, offers:mixedOffers }, "USD"),
+    unavailableIgnored: !sortedUsdOffers.includes(unavailableOffer),
+    invalidIgnored: !sortedUsdOffers.includes(invalidOffer),
+    missingPriceIgnored: !sortedUsdOffers.includes(missingPriceOffer),
+    saleSavingsAmount: calculateOfferSavingsAmount(validOffer),
+    saleSavingsPercent: calculateOfferSavingsPercent(validOffer),
+    duplicatesStable: sortedUsdOffers.filter(offer => offer.offerId === "test-valid").length === 2,
+    incompatibleVariantRejected: !sortedUsdOffers.includes(incompatibleOffer),
+    differentCurrencyExcluded: !sortedUsdOffers.includes(euroOffer)
+  };
+
+  console.assert(results.lowestValidAvailable === validOffer, "Offer test failed: lowest valid available price");
+  console.assert(results.unavailableIgnored, "Offer test failed: unavailable offer must be ignored");
+  console.assert(results.invalidIgnored, "Offer test failed: invalid price must be ignored");
+  console.assert(results.missingPriceIgnored, "Offer test failed: missing price must be ignored");
+  console.assert(results.saleSavingsAmount === 20 && results.saleSavingsPercent === 20, "Offer test failed: sale savings calculation");
+  console.assert(results.duplicatesStable, "Offer test failed: duplicate offers must sort safely");
+  console.assert(results.incompatibleVariantRejected, "Offer test failed: incompatible variant must be rejected");
+  console.assert(results.differentCurrencyExcluded, "Offer test failed: currencies must not be directly compared");
+  return results;
+}
+
+const developmentOfferTestResults = runDevelopmentOfferTests();
+window.PriceAlertOffers = Object.freeze({
+  validOfferPrice,
+  currentOfferPrice,
+  regularAndSalePrice,
+  calculateOfferSavingsAmount,
+  calculateOfferSavingsPercent,
+  isOfferCurrentlyAvailable,
+  isOfferCompatibleWithProduct,
+  sortOffersByLowestPrice,
+  bestAvailableOffer,
+  developmentOfferTestResults
+});
+
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem("priceAlertShoppingList") || "[]").filter(id => typeof id === "string"); }
   catch { return []; }
@@ -317,12 +430,12 @@ function initializeOptions() {
 }
 
 function searchableText(product) {
-  return [product.id,product.slug,product.name,product.brand,product.modelNumber,product.category,product.description,...Object.values(product.specifications),...product.offers.flatMap(item => [item.retailer,item.retailerProductId])].filter(Boolean).join(" ").toLowerCase();
+  return [product.id,product.slug,product.name,product.brand,product.modelNumber,product.category,product.description,...Object.values(product.specifications),...product.offers.flatMap(item => [item.retailerName,item.retailerProductId,item.retailerSku])].filter(Boolean).join(" ").toLowerCase();
 }
-function offerMatchesFilters(item) {
-  if (state.retailer && item.retailer !== state.retailer) return false;
-  if (state.availability === "available" && /out of stock/i.test(item.availability)) return false;
-  if (state.availability === "pickup" && !/pickup/i.test(item.shipping)) return false;
+function offerMatchesFilters(item, product) {
+  if (!isOfferCurrentlyAvailable(item, product)) return false;
+  if (state.retailer && item.retailerName !== state.retailer) return false;
+  if (state.availability === "pickup" && !item.pickupAvailable && !/pickup/i.test(item.shipping || "")) return false;
   return true;
 }
 function filteredProducts() {
@@ -330,14 +443,16 @@ function filteredProducts() {
   const matches = products.filter(product => {
     if (query && !searchableText(product).includes(query)) return false;
     if (state.category && product.category !== state.category) return false;
-    const eligibleOffers = product.offers.filter(offerMatchesFilters);
+    const eligibleOffers = product.offers.filter(item => offerMatchesFilters(item, product));
     if (!eligibleOffers.length) return false;
-    const eligibleLow = Math.min(...eligibleOffers.map(item => item.price));
+    const eligibleLowOffer = sortOffersByLowestPrice(eligibleOffers, { product })[0];
+    const eligibleLow = eligibleLowOffer ? currentOfferPrice(eligibleLowOffer) : null;
+    if (eligibleLow === null) return false;
     if (state.min !== "" && eligibleLow < Number(state.min)) return false;
     if (state.max !== "" && eligibleLow > Number(state.max)) return false;
     return true;
   });
-  return matches.sort((a,b) => state.sort === "name" ? a.name.localeCompare(b.name) : state.sort === "high" ? lowest(b)-lowest(a) : lowest(a)-lowest(b));
+  return matches.sort((a,b) => state.sort === "name" ? a.name.localeCompare(b.name) : state.sort === "high" ? (lowest(b) ?? -Infinity)-(lowest(a) ?? -Infinity) : (lowest(a) ?? Infinity)-(lowest(b) ?? Infinity));
 }
 
 function renderResults({scroll=false}={}) {
@@ -370,20 +485,20 @@ function renderDeals() {
   const deals = products.filter(product => discountAmount(product) > 0).sort((a,b) => discountAmount(b)-discountAmount(a)).slice(0,3);
   $("#deal-grid").innerHTML = deals.map(product => {
     const bestOffer = lowestOffer(product);
-    const savings = Math.round((1-bestOffer.price/bestOffer.regularPrice)*100);
-    return `<article class="deal-card">${renderProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3><div class="deal-prices"><strong>${money(bestOffer.price)}</strong><del>${money(bestOffer.regularPrice)}</del></div><p class="savings">Save ${savings}% in this sample offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare sample prices →</button></div></article>`;
+    const savings = Math.round(calculateOfferSavingsPercent(bestOffer));
+    return `<article class="deal-card">${renderProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3><div class="deal-prices"><strong>${money(currentOfferPrice(bestOffer), bestOffer.currency)}</strong><del>${money(bestOffer.regularPrice, bestOffer.currency)}</del></div><p class="savings">Save ${savings}% in this sample offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare sample prices →</button></div></article>`;
   }).join("");
 }
 
 function showComparison(id) {
   const product = products.find(item => item.id === id); if (!product) return;
-  const offers = [...product.offers].sort((a,b) => a.price-b.price);
+  const offers = sortOffersByLowestPrice(product.offers, { product });
   const historyPrices = product.priceHistory.map(entry => entry.price);
   const minHistory = Math.min(...historyPrices), maxHistory = Math.max(...historyPrices);
   const range = Math.max(maxHistory-minHistory,1);
   $("#comparison-content").innerHTML = `
     <div class="comparison-top">${renderProductMedia(product, { lazy:false })}<div><p class="product-brand">${escapeHtml(product.brand)} · ${escapeHtml(product.category)}</p><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>Model ${escapeHtml(product.modelNumber)} · Item ${escapeHtml(product.specifications.itemNumber)} · UPC ${escapeHtml(product.specifications.upc)}</p><p>${escapeHtml(product.description)}</p></div><div class="comparison-actions"><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}">♡ ${state.saved.includes(product.id)?"Saved":"Save to Shopping List"}</button><button class="text-button" type="button" data-close-comparison>Close comparison</button></div></div>
-    <div class="comparison-grid"><div class="panel"><h3>Compare sample retailer offers</h3><div class="offer-list">${offers.map((item,index) => `<article class="offer-card${index===0?" best":""}"><div><span class="retailer-name">${escapeHtml(item.retailer)}</span>${index===0?'<span class="best-badge">Best Price</span>':""}</div><div><div>${escapeHtml(item.availability)}</div><div class="offer-detail">${escapeHtml(item.shipping)}</div></div><div class="offer-price">${money(item.price)}</div><a class="button button-primary" href="${offerDestination(item)}" data-sample-link>View Deal</a></article>`).join("")}</div></div>
+    <div class="comparison-grid"><div class="panel"><h3>Compare sample retailer offers</h3><div class="offer-list">${offers.map((item,index) => { const savings = calculateOfferSavingsAmount(item); return `<article class="offer-card${index===0?" best":""}"><div><span class="retailer-name">${escapeHtml(item.retailerName)}</span>${index===0?'<span class="best-badge">Best Price</span>':""}</div><div><div>${escapeHtml(item.availability)}</div><div class="offer-detail">${escapeHtml(item.shipping || "Sample fulfillment details unavailable")}${savings > 0 ? ` · Save ${money(savings, item.currency)}` : ""}</div></div><div class="offer-price">${money(currentOfferPrice(item), item.currency)}</div><a class="button button-primary" href="${offerDestination(item)}" data-sample-link>View Deal</a></article>`; }).join("")}</div></div>
     <aside class="panel"><h3>Development price history</h3><div class="history-chart" aria-label="Six-month sample price history">${product.priceHistory.map((entry,index) => `<div class="history-bar" style="--height:${35+((entry.price-minHistory)/range)*65}%" data-price="${money(entry.price)}" title="${escapeHtml(entry.label)}: ${money(entry.price)}"></div>`).join("")}</div><div class="history-labels"><span>6 months ago</span><span>Current sample</span></div>
       <div class="alert-box"><h3>Price Drop Alert</h3><p>Set a target for this product. Alerts are not active in this development version.</p><form class="alert-form" data-alert-form><input type="email" name="email" required placeholder="Email address" aria-label="Email address"><input type="number" name="price" min="1" step=".01" required placeholder="Desired price" aria-label="Desired price"><button class="button button-primary" type="submit">Set Price Alert</button></form><p class="alert-message" data-alert-message hidden></p></div>
     </aside></div>`;

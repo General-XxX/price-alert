@@ -27,20 +27,89 @@
     "yeti-cooler": { size:"Tundra 45", capacity:"35 qt", material:"Rotomolded polyethylene", color:"White" }
   };
 
-  function createOffer(retailer, price, availability, shipping, regularPrice) {
+  const retailerNames = [
+    ["lowes", "Lowe's"], ["home-depot", "Home Depot"], ["walmart", "Walmart"],
+    ["best-buy", "Best Buy"], ["ebay", "eBay"], ["amazon", "Amazon"]
+  ];
+  const retailers = retailerNames.map(([retailerId, name]) => ({
+    retailerId,
+    name,
+    displayName: name,
+    website: null,
+    logo: null,
+    retailerType: null,
+    affiliateProgram: null,
+    affiliateNetwork: null,
+    affiliateStatus: "not-connected",
+    supportsApi: null,
+    supportsProductFeed: null,
+    supportsPriceUpdates: null,
+    supportsAvailability: null,
+    supportsShipping: null,
+    supportsStorePickup: null,
+    dataSource: "sample-development",
+    retailerStatus: "sample-development"
+  }));
+
+  function finitePrice(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : null;
+  }
+
+  function createOffer(product, values, index, variantId) {
+    const [retailerName, rawPrice, availability, shipping, rawRegularPrice] = [...values, product.regularPrice].slice(0, 5);
+    const retailer = retailers.find(item => item.name === retailerName);
+    const price = finitePrice(rawPrice);
+    const regularPrice = finitePrice(rawRegularPrice);
+    const savingsAmount = price !== null && regularPrice !== null && regularPrice > price ? Number((regularPrice - price).toFixed(2)) : 0;
+    const savingsPercent = savingsAmount > 0 && regularPrice > 0 ? Number(((savingsAmount / regularPrice) * 100).toFixed(2)) : 0;
+    const pickupAvailable = /pickup/i.test(shipping || "");
+    const shippingAvailable = /shipping|delivery/i.test(shipping || "");
     return {
-      retailer,
+      offerId: `${product.id}-${retailer ? retailer.retailerId : "retailer"}-${index + 1}`,
+      retailerId: retailer ? retailer.retailerId : null,
+      retailerName,
       retailerProductId: null,
+      retailerSku: null,
+      retailerModelNumber: product.modelNumber,
+      variantId,
       price,
       regularPrice,
+      salePrice: savingsAmount > 0 ? price : null,
+      savingsAmount,
+      savingsPercent,
       currency: DEFAULT_CURRENCY,
+      saleStatus: savingsAmount > 0 ? "sample-sale" : "regular-price",
       availability,
+      stockStatus: /out of stock/i.test(availability || "") ? "out-of-stock" : /limited/i.test(availability || "") ? "limited-stock" : "in-stock",
+      quantityAvailable: null,
+      shippingAvailable,
+      shippingPrice: /free shipping/i.test(shipping || "") ? 0 : null,
+      freeShipping: /free shipping/i.test(shipping || "") ? true : null,
+      pickupAvailable,
+      pickupStore: null,
+      deliveryEstimate: null,
+      storeLocation: {
+        storeId: null,
+        storeName: null,
+        city: null,
+        state: null,
+        postalCode: null,
+        pickupAvailability: pickupAvailable ? "sample-available" : null,
+        storePrice: null
+      },
       productUrl: "#",
       affiliateUrl: null,
       affiliateProgram: null,
       affiliateDisclosureRequired: false,
+      affiliateTrackingStatus: "not-connected",
       shipping,
-      lastChecked: null
+      lastChecked: null,
+      lastPriceChange: null,
+      offerStatus: "sample-active",
+      dataSource: "sample-development",
+      dataStatus: DATA_STATUS
     };
   }
 
@@ -111,7 +180,7 @@
         isDefaultVariant: true,
         variantStatus: "sample-development"
       }],
-      offers: config.offers.map(offer => createOffer(...offer, config.regularPrice)),
+      offers: config.offers.map((offer, index) => createOffer(config, offer, index, variantId)),
       priceHistory: config.priceHistory.map((price, index) => ({
         recordedAt: null,
         label: index === config.priceHistory.length - 1 ? "Current sample" : `Sample month ${index + 1}`,
@@ -153,10 +222,8 @@
     { name:"Outdoor", visualMark:"OD" }
   ];
 
-  const retailers = ["Lowe's", "Home Depot", "Walmart", "Best Buy", "eBay", "Amazon"];
-
   window.PriceAlertData = Object.freeze({
-    schemaVersion: "1.3.0",
+    schemaVersion: "1.4.0",
     dataStatus: DATA_STATUS,
     products,
     categories,
