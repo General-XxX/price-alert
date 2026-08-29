@@ -1,0 +1,28 @@
+[
+  {
+    "id": "fixture-work-light",
+    "brand": "Fixture Brand",
+    "productName": "Cordless Work Light",
+    "modelNumber": "FIX-LIGHT-01",
+    "category": "Tools",
+    "description": "Development fixture used to verify batch normalization.",
+    "specifications": { "powerSource": "Battery", "color": "Yellow" },
+    "variants": [{ "variantId": "fixture-work-light-default", "variantName": "Default configuration", "modelNumber": "FIX-LIGHT-01", "isDefaultVariant": true, "variantStatus": "sample-development" }],
+    "offers": [{ "retailerName": "Lowe's", "price": 39.99, "regularPrice": 49.99, "currency": "USD", "availability": "Fixture availability", "dataSource": "sample-batch-fixture", "dataStatus": "sample-development" }],
+    "sourceMetadata": { "sourceType": "sample-json-fixture", "importBatch": "foundation-test" },
+    "dataStatus": "sample-development"
+  },
+  {
+    "id": "fixture-usb-hub",
+    "brand": "Fixture Brand",
+    "productName": "USB-C Connectivity Hub",
+    "modelNumber": "FIX-HUB-02",
+    "category": "Computers",
+    "description": "Second development fixture used to verify multi-product imports.",
+    "specifications": { "connectivity": "USB-C", "color": "Gray" },
+    "variants": [{ "variantId": "fixture-usb-hub-default", "variantName": "Default configuration", "modelNumber": "FIX-HUB-02", "isDefaultVariant": true, "variantStatus": "sample-development" }],
+    "offers": [{ "retailerName": "Best Buy", "price": 29.99, "currency": "USD", "availability": "Fixture availability", "dataSource": "sample-batch-fixture", "dataStatus": "sample-development" }],
+    "sourceMetadata": { "sourceType": "sample-json-fixture", "importBatch": "foundation-test" },
+    "dataStatus": "sample-development"
+  }
+]

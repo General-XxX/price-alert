@@ -1,7 +1,8 @@
 // Interface logic consumes the catalog contract exposed by products.js.
 const catalog = window.PriceAlertData;
+const alertStorage = window.PriceAlertStorage;
 
-if (!catalog || !Array.isArray(catalog.products) || !Array.isArray(catalog.categories)) {
+if (!catalog || !Array.isArray(catalog.products) || !Array.isArray(catalog.categories) || !alertStorage) {
   throw new Error("Price Alert product data failed to load.");
 }
 
@@ -82,40 +83,13 @@ const discountAmount = (product) => {
   const bestOffer = lowestOffer(product);
   return bestOffer ? calculateOfferSavingsAmount(bestOffer) : 0;
 };
-const RETAILER_SEARCH_URLS = Object.freeze({
-  lowes: query => `https://www.lowes.com/search?searchTerm=${encodeURIComponent(query)}`,
-  "home-depot": query => `https://www.homedepot.com/s/${encodeURIComponent(query)}`,
-  walmart: query => `https://www.walmart.com/search?q=${encodeURIComponent(query)}`,
-  "best-buy": query => `https://www.bestbuy.com/site/searchpage.jsp?st=${encodeURIComponent(query)}`,
-  ebay: query => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`,
-  amazon: query => `https://www.amazon.com/s?k=${encodeURIComponent(query)}`
-});
-
-function validExternalUrl(value) {
-  if (typeof value !== "string" || !value.trim() || value.trim() === "#") return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
-function retailerSearchUrl(offer, product) {
-  const builder = RETAILER_SEARCH_URLS[offer && offer.retailerId];
-  if (!builder || !product) return null;
-  const query = [product.brand, product.modelNumber, product.name].filter(Boolean).join(" ");
-  return query ? builder(query) : null;
-}
-
-function resolveOfferDestination(offer, product) {
-  const affiliateUrl = validExternalUrl(offer && offer.affiliateUrl);
-  if (affiliateUrl) return { url:affiliateUrl, linkType:"affiliate", label:`View at ${offer.retailerName}` };
-  const productUrl = validExternalUrl(offer && offer.productUrl);
-  if (productUrl) return { url:productUrl, linkType:"product", label:`View at ${offer.retailerName}` };
-  const searchUrl = retailerSearchUrl(offer, product);
-  return searchUrl ? { url:searchUrl, linkType:"retailer-search", label:`Search ${offer.retailerName}` } : null;
-}
+const productDetailPath = product => product && product.id === "dewalt-drill" ? "products/dewalt-dcd771c2/index.html" : null;
+const productTitleMarkup = product => {
+  const path = productDetailPath(product);
+  return path ? `<a class="product-title-link" href="${path}">${escapeHtml(product.name)}</a>` : escapeHtml(product.name);
+};
+if (!window.PriceAlertRetailerLinks) throw new Error("Price Alert retailer link helpers failed to load.");
+const { validExternalUrl, retailerSearchUrl, resolveOfferDestination, retailerSearchUrls:RETAILER_SEARCH_URLS } = window.PriceAlertRetailerLinks;
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char]);
 
 // Product identity helpers are intentionally independent of the current UI so
@@ -481,6 +455,28 @@ window.PriceAlertMedia = Object.freeze({
 function savedClass(id) { return state.saved.includes(id) ? " saved" : ""; }
 function savedLabel(id) { return state.saved.includes(id) ? "Remove from shopping list" : "Save to shopping list"; }
 
+function targetPriceValue(currentPrice, percent = 10) {
+  return Math.max(0.01, Number((currentPrice * (1 - percent / 100)).toFixed(2)));
+}
+
+function renderTargetPriceAlert(product, currentPrice) {
+  const variant = defaultVariant(product);
+  const minimum = Math.max(0.01, Number((currentPrice * .25).toFixed(2)));
+  const maximum = Math.max(minimum, Number((currentPrice - .01).toFixed(2)));
+  const selected = Math.min(maximum, Math.max(minimum, targetPriceValue(currentPrice)));
+  return `<section class="target-alert" data-product-alert data-product-id="${escapeHtml(product.id)}" data-variant-id="${escapeHtml(variant ? variant.variantId : "")}" data-current-price="${currentPrice}" data-currency="${escapeHtml((lowestOffer(product) && lowestOffer(product).currency) || "USD")}" aria-labelledby="target-alert-title-${escapeHtml(product.id)}">
+    <div class="target-alert-price"><span>Current lowest available price</span><strong>${money(currentPrice)}</strong></div>
+    <h3 id="target-alert-title-${escapeHtml(product.id)}">Target Price Alert</h3>
+    <p class="target-prompt">Alert me when the price drops to:</p>
+    <div class="target-value" aria-live="polite"><output data-target-output>${money(selected)}</output></div>
+    <input class="target-slider" data-target-slider type="range" min="${minimum}" max="${maximum}" step="0.01" value="${selected}" aria-label="Target price">
+    <div class="target-quick-actions" aria-label="Quick target prices"><button type="button" data-target-percent="5">5% lower</button><button type="button" data-target-percent="10" class="active">10% lower</button><button type="button" data-target-percent="20">20% lower</button></div>
+    <p class="target-explanation">Price Alert will notify you if any matched retailer reaches or falls below your target price.</p>
+    <form class="target-alert-form" data-target-alert-form novalidate><label><span>Email address</span><input type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label><button class="button button-primary" type="submit">Set Price Alert</button></form>
+    <p class="target-alert-message" data-target-message role="status" hidden></p>
+  </section>`;
+}
+
 function initializeOptions() {
   $("#category-grid").innerHTML = categories.map(({name,visualMark}) => {
     const count = products.filter(product => product.category === name).length;
@@ -522,7 +518,7 @@ function renderResults({scroll=false}={}) {
   $("#product-grid").innerHTML = matches.map(product => `
     <article class="product-card">
       ${renderProductMedia(product)}
-      <div class="product-body"><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3>
+      <div class="product-body"><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${productTitleMarkup(product)}</h3>
         <p class="product-meta">Model ${escapeHtml(product.modelNumber)} · ${escapeHtml(product.category)}</p>
         <div class="product-price-row"><div class="from-price"><small>Lowest price</small><strong>${money(lowest(product))}</strong></div><span class="store-count">${product.offers.length} stores<br>offering it</span></div>
         <div class="card-actions"><button class="button button-primary" type="button" data-compare="${product.id}">Compare Prices</button><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}" aria-label="${savedLabel(product.id)}" title="${savedLabel(product.id)}">♡</button></div>
@@ -547,7 +543,7 @@ function renderDeals() {
   $("#deal-grid").innerHTML = deals.map(product => {
     const bestOffer = lowestOffer(product);
     const savings = Math.round(calculateOfferSavingsPercent(bestOffer));
-    return `<article class="deal-card">${renderProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${escapeHtml(product.name)}</h3><div class="deal-prices"><strong>${money(currentOfferPrice(bestOffer), bestOffer.currency)}</strong><del>${money(bestOffer.regularPrice, bestOffer.currency)}</del></div><p class="savings">Save ${savings}% on this offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare prices →</button></div></article>`;
+    return `<article class="deal-card">${renderProductMedia(product)}<div><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${productTitleMarkup(product)}</h3><div class="deal-prices"><strong>${money(currentOfferPrice(bestOffer), bestOffer.currency)}</strong><del>${money(bestOffer.regularPrice, bestOffer.currency)}</del></div><p class="savings">Save ${savings}% on this offer</p><button class="text-button" type="button" data-compare="${product.id}">Compare prices →</button></div></article>`;
   }).join("");
 }
 
@@ -561,7 +557,7 @@ function showComparison(id) {
     <div class="comparison-top">${renderProductMedia(product, { lazy:false })}<div><p class="product-brand">${escapeHtml(product.brand)} · ${escapeHtml(product.category)}</p><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>Model ${escapeHtml(product.modelNumber)} · Item ${escapeHtml(product.specifications.itemNumber)} · UPC ${escapeHtml(product.specifications.upc)}</p><p>${escapeHtml(product.description)}</p></div><div class="comparison-actions"><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}">♡ ${state.saved.includes(product.id)?"Saved":"Save to Shopping List"}</button><button class="text-button" type="button" data-close-comparison>Close comparison</button></div></div>
     <div class="comparison-grid"><div class="panel"><h3>Compare retailer offers</h3><div class="offer-list">${offers.map((item,index) => { const savings = calculateOfferSavingsAmount(item); const destination = resolveOfferDestination(item, product); return `<article class="offer-card${index===0?" best":""}"><div><span class="retailer-name">${escapeHtml(item.retailerName)}</span>${index===0?'<span class="best-badge">Best Price</span>':""}</div><div><div>${escapeHtml(item.availability)}</div><div class="offer-detail">${escapeHtml(item.shipping || "Shipping details vary")}${savings > 0 ? ` · Save ${money(savings, item.currency)}` : ""}</div></div><div class="offer-price">${money(currentOfferPrice(item), item.currency)}</div>${destination ? `<a class="button button-primary" href="${escapeHtml(destination.url)}" target="_blank" rel="noopener noreferrer sponsored" data-retailer-link="${destination.linkType}">${escapeHtml(destination.label)}</a>` : ""}</article>`; }).join("")}</div></div>
     <aside class="panel"><h3>Price history</h3><div class="history-chart" aria-label="Six-month price history">${product.priceHistory.map((entry,index) => `<div class="history-bar" style="--height:${35+((entry.price-minHistory)/range)*65}%" data-price="${money(entry.price)}" title="${escapeHtml(entry.label)}: ${money(entry.price)}"></div>`).join("")}</div><div class="history-labels"><span>6 months ago</span><span>Current</span></div>
-      <div class="alert-box"><h3>Price Drop Alert</h3><p>Enter an email address and target price for this product.</p><form class="alert-form" data-alert-form><input type="email" name="email" required placeholder="Email address" aria-label="Email address"><input type="number" name="price" min="1" step=".01" required placeholder="Desired price" aria-label="Desired price"><button class="button button-primary" type="submit">Set Price Alert</button></form><p class="alert-message" data-alert-message hidden></p></div>
+      ${renderTargetPriceAlert(product, currentOfferPrice(offers[0]))}
     </aside></div>`;
   $("#comparison").hidden = false;
   $("#comparison").scrollIntoView({behavior:"smooth",block:"start"});
@@ -613,11 +609,20 @@ document.addEventListener("click", event => {
   const save=event.target.closest("[data-save]"); if(save) toggleSave(save.dataset.save);
   if(event.target.closest("[data-close-comparison]")) $("#comparison").hidden=true;
   const dialogButton=event.target.closest("[data-dialog]"); if(dialogButton) { const [title,copy]=dialogCopy[dialogButton.dataset.dialog]; $("#dialog-content").innerHTML=`<h2 id="dialog-title">${title}</h2><p>${copy}</p>`; $("#info-dialog").showModal(); }
+  const quickTarget=event.target.closest("[data-target-percent]"); if(quickTarget) { const alert=quickTarget.closest("[data-product-alert]"); const slider=alert.querySelector("[data-target-slider]"); const current=Number(alert.dataset.currentPrice); slider.value=Math.min(Number(slider.max),Math.max(Number(slider.min),targetPriceValue(current,Number(quickTarget.dataset.targetPercent)))); alert.querySelector("[data-target-output]").textContent=money(Number(slider.value),alert.dataset.currency); alert.querySelectorAll("[data-target-percent]").forEach(button=>button.classList.toggle("active",button===quickTarget)); }
 });
-document.addEventListener("submit", event => { if(!event.target.matches("[data-alert-form]"))return; event.preventDefault(); const message=event.target.parentElement.querySelector("[data-alert-message]"); message.textContent="Your target price has been noted for this browsing session."; message.hidden=false; event.target.reset(); });
+document.addEventListener("input", event => { if(!event.target.matches("[data-target-slider]"))return; const alert=event.target.closest("[data-product-alert]"); alert.querySelector("[data-target-output]").textContent=money(Number(event.target.value),alert.dataset.currency); alert.querySelectorAll("[data-target-percent]").forEach(button=>button.classList.remove("active")); });
+document.addEventListener("submit", event => { if(!event.target.matches("[data-target-alert-form]"))return; event.preventDefault(); const alert=event.target.closest("[data-product-alert]"); const email=event.target.elements.email; const message=alert.querySelector("[data-target-message]"); const result=alertStorage.saveProductAlert({productId:alert.dataset.productId,variantId:alert.dataset.variantId||null,targetPrice:alert.querySelector("[data-target-slider]").value,email:email.value,currency:alert.dataset.currency,currentLowestPrice:alert.dataset.currentPrice}); message.textContent=result.ok?"Price alert saved on this device. Email notifications will be enabled when the Price Alert notification service launches.":result.error; message.classList.toggle("error",!result.ok); message.hidden=false; if(!result.ok) email.focus(); });
 document.addEventListener("error", event => { if (event.target && event.target.matches && event.target.matches(".product-image")) fallbackProductImage(event.target); }, true);
 $("#clear-list").addEventListener("click",()=>{ state.saved=[]; persistSaved(); renderShoppingList(); showToast("Shopping list cleared."); });
 $("#dialog-close").addEventListener("click",()=>$("#info-dialog").close());
 $("#info-dialog").addEventListener("click",event=>{ if(event.target===$("#info-dialog")) $("#info-dialog").close(); });
 
-initializeOptions(); renderDeals(); renderShoppingList();
+initializeOptions();
+const initialCategory = new URLSearchParams(window.location.search).get("category");
+if (initialCategory && categories.some(category => category.name === initialCategory)) {
+  state.category = initialCategory;
+  $("#category-filter").value = initialCategory;
+  renderResults();
+}
+renderDeals(); renderShoppingList();

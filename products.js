@@ -3,6 +3,9 @@
 (function () {
   "use strict";
 
+  const importer = window.PriceAlertImporter;
+  if (!importer) throw new Error("Price Alert catalog importer failed to load.");
+
   const DATA_STATUS = "sample-development";
   const DEFAULT_CURRENCY = "USD";
 
@@ -222,10 +225,13 @@
     { name:"Outdoor", visualMark:"OD" }
   ];
 
+  const normalizedCatalog = importer.importBatch(products, { dataStatus:DATA_STATUS });
+  if (normalizedCatalog.errors.length) throw new Error(`Price Alert catalog normalization failed: ${normalizedCatalog.errors.join("; ")}`);
+
   window.PriceAlertData = Object.freeze({
-    schemaVersion: "1.4.0",
+    schemaVersion: "1.5.0",
     dataStatus: DATA_STATUS,
-    products,
+    products: normalizedCatalog.products,
     categories,
     retailers
   });
