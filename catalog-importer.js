@@ -147,17 +147,7 @@
     return { products, errors };
   }
 
-  const developmentTests = (() => {
-    const json = importBatch(JSON.stringify([{ brand:"Fixture", productName:"Widget A", model:"A-1", offers:[{ retailer:"Amazon", price:"19.99", currency:"USD" }] }, { brand:"Fixture", productName:"Widget B", model:"B-2" }]));
-    const csv = importBatch('brand,productName,model,upc\nFixture,CSV Widget,C-3,000000000003', { format:"csv" });
-    const authorized = normalizeProduct({ brand:"Fixture", name:"Image Widget", model:"IMG-1", imageUrl:"https://example.invalid/authorized.webp", imageSource:"development-test", imageLicenseOrPermission:"authorized-feed" }).product;
-    const unverified = normalizeProduct({ brand:"Fixture", name:"Unverified Image", model:"IMG-2", imageUrl:"https://example.invalid/unverified.webp" }).product;
-    const results = { jsonBatch:json.products.length === 2 && !json.errors.length, csvBatch:csv.products.length === 1 && csv.products[0].identity.upc === "000000000003", priceNormalized:json.products[0].offers[0].price === 19.99, authorizedImageAccepted:Boolean(authorized.media.primaryImage), unverifiedImageRejected:unverified.media.primaryImage === null };
-    Object.entries(results).forEach(([name, passed]) => console.assert(passed, `Importer test failed: ${name}`));
-    return results;
-  })();
-
-  const api = Object.freeze({ importBatch, normalizeProduct, normalizeOffer, normalizeMedia, parseCsv, developmentTests });
+  const api = Object.freeze({ importBatch, normalizeProduct, normalizeOffer, normalizeMedia, parseCsv });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.PriceAlertImporter = api;
 }());

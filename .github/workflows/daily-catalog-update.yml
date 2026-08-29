@@ -29,6 +29,11 @@ jobs:
       - name: Test Step 4 pipeline and public integration
         run: node scripts/tests/step4.test.js
 
+      - name: Test Step 5 monitoring and Step 6 launch readiness
+        run: |
+          node scripts/tests/price-monitoring.test.js
+          node scripts/tests/launch-readiness.test.js
+
       - name: Upload update report and preview
         uses: actions/upload-artifact@v4
         with:

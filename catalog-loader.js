@@ -11,7 +11,8 @@
   }
 
   function productionProductIsSafe(product) {
-    if (!product || !product.id || !product.slug || product.dataStatus !== "production-approved" || blockedStatus.test(JSON.stringify(product.sourceMetadata || {}))) return false;
+    const hasPrivateFields=value=>Array.isArray(value)?value.some(hasPrivateFields):Boolean(value&&typeof value==="object"&&Object.entries(value).some(([key,item])=>/^(email|customerEmail|customer_email|password)$/i.test(key)||hasPrivateFields(item)));
+    if (!product || !product.id || !product.slug || product.dataStatus !== "production-approved" || blockedStatus.test(JSON.stringify(product.sourceMetadata || {})) || hasPrivateFields(product)) return false;
     const media = product.media || {};
     const images = [media.primaryImage, media.thumbnail, ...(Array.isArray(media.galleryImages) ? media.galleryImages : [])].filter(Boolean);
     if (images.length && (images.some(image => !httpUrl(image)) || !media.imageSource || !approvedImagePermission.test(media.imageLicenseOrPermission || ""))) return false;

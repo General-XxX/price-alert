@@ -26,6 +26,7 @@ assert.equal(validatePublish({ metadata:{ ...approvedMetadata, environment:"deve
 assert.equal(validatePublish({ metadata:approvedMetadata, products:[{ ...product, dataStatus:"sample-development" }], incomingProducts:[], report:cleanReport }).valid, false);
 assert.equal(validatePublish({ metadata:approvedMetadata, products:[{ ...product, offers:[{ ...product.offers[0], productUrl:"javascript:alert(1)" }] }], incomingProducts:[], report:cleanReport }).valid, false);
 assert.equal(validatePublish({ metadata:approvedMetadata, products:[{ ...product, media:{ primaryImage:"https://images.invalid/p.jpg", imageSource:"", imageLicenseOrPermission:"unknown" } }], incomingProducts:[], report:cleanReport }).valid, false);
+assert.equal(validatePublish({ metadata:approvedMetadata, products:[{ ...product, customerEmail:"private@example.com" }], incomingProducts:[], report:cleanReport }).valid, false);
 
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "price-alert-publish-test-"));
 const outputPath = path.join(temporaryRoot, "data", "catalog.generated.json");

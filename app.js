@@ -14,7 +14,10 @@ const retailers = retailerRecords.length && typeof retailerRecords[0] === "objec
   : retailerRecords;
 const state = { query:"", category:"", retailer:"", min:"", max:"", availability:"", sort:"low", saved:loadSaved() };
 const $ = (selector) => document.querySelector(selector);
-const money = (value, currency = "USD") => new Intl.NumberFormat("en-US", { style:"currency", currency }).format(value);
+const money = (value, currency = "USD") => {
+  const number = Number(value);
+  return value === null || value === undefined || value === "" || !Number.isFinite(number) ? "Price unavailable" : new Intl.NumberFormat("en-US", { style:"currency", currency }).format(number);
+};
 
 function validOfferPrice(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -241,44 +244,6 @@ function compareProductIdentity(first, second) {
   return finish({ isMatch:false, confidence:"low", matchedBy:null, reviewRequired:true });
 }
 
-function runDevelopmentMatchingTests() {
-  const source = products[0];
-  const consoleProduct = products.find(product => product.id === "ps5-slim");
-  const televisionRecord = { name:"Sample TV", specifications:{ screenSize:"55-inch" }, variants:[{ isDefaultVariant:true, size:"55-inch" }] };
-  const laptopRecord = products.find(product => product.id === "macbook-air");
-  const withoutStrongIdentifiers = { ...source, retailerIdentifiers:{}, identity:{ ...source.identity, upc:null, gtin:null, mpn:null, manufacturer:null } };
-  const results = {
-    sameUpcAndModel: compareProductIdentity(source, { ...source, id:"development-copy" }),
-    formattedBrandModel: compareProductIdentity(withoutStrongIdentifiers, { ...withoutStrongIdentifiers, identity:{ ...withoutStrongIdentifiers.identity, modelNumber:"DCD-771 C2" } }),
-    differentModel: compareProductIdentity(withoutStrongIdentifiers, { ...withoutStrongIdentifiers, identity:{ ...withoutStrongIdentifiers.identity, modelNumber:"DCD999" } }),
-    similarNameOnly: compareProductIdentity(
-      { ...withoutStrongIdentifiers, brand:null, identity:{ ...withoutStrongIdentifiers.identity, brand:null, modelNumber:null }, name:"20V MAX Cordless Drill Kit" },
-      { ...withoutStrongIdentifiers, brand:null, identity:{ ...withoutStrongIdentifiers.identity, brand:null, modelNumber:null }, name:"20V Max Cordless Drill Kit Bundle" }
-    ),
-    sameConfiguration: compareVariantCompatibility(source, { ...source, id:"same-configuration" }),
-    toolOnlyVsKit: compareVariantCompatibility(source, { ...source, specifications:{ ...source.specifications, toolOnly:true }, variants:[] }),
-    consoleStorageConflict: compareVariantCompatibility(consoleProduct, { ...consoleProduct, specifications:{ ...consoleProduct.specifications, storage:"64 GB" }, variants:[] }),
-    televisionSizeConflict: compareVariantCompatibility(televisionRecord, { ...televisionRecord, specifications:{ screenSize:"65 inch" }, variants:[] }),
-    laptopConfigurationConflict: compareVariantCompatibility(laptopRecord, { ...laptopRecord, specifications:{ ...laptopRecord.specifications, memory:"16 GB", storage:"512 GB SSD" }, variants:[] }),
-    formattedVoltage: normalizeVariantValue("20V MAX") === normalizeVariantValue("20 V MAX"),
-    conflictingVariantRejectsIdentity: compareProductIdentity(source, { ...source, specifications:{ ...source.specifications, toolOnly:true }, variants:[] })
-  };
-
-  console.assert(results.sameUpcAndModel.isMatch && results.sameUpcAndModel.confidence === "high", "Matching test failed: exact UPC/model");
-  console.assert(results.formattedBrandModel.isMatch && results.formattedBrandModel.matchedBy === "model", "Matching test failed: normalized brand/model");
-  console.assert(!results.differentModel.isMatch, "Matching test failed: different models must not match");
-  console.assert(!results.similarNameOnly.isMatch && results.similarNameOnly.confidence === "low", "Matching test failed: name similarity is only a candidate signal");
-  console.assert(results.sameConfiguration.compatible, "Variant test failed: identical configurations must be compatible");
-  console.assert(!results.toolOnlyVsKit.compatible && results.toolOnlyVsKit.conflicts.includes("toolOnly"), "Variant test failed: tool-only and kit must conflict");
-  console.assert(!results.consoleStorageConflict.compatible && results.consoleStorageConflict.conflicts.includes("storage"), "Variant test failed: console storage must conflict");
-  console.assert(!results.televisionSizeConflict.compatible && results.televisionSizeConflict.conflicts.includes("screenSize"), "Variant test failed: television size must conflict");
-  console.assert(!results.laptopConfigurationConflict.compatible && results.laptopConfigurationConflict.conflicts.includes("memory") && results.laptopConfigurationConflict.conflicts.includes("storage"), "Variant test failed: laptop memory/storage must conflict");
-  console.assert(results.formattedVoltage, "Variant test failed: formatted voltage values must normalize equally");
-  console.assert(!results.conflictingVariantRejectsIdentity.isMatch && results.conflictingVariantRejectsIdentity.reviewRequired, "Matching test failed: strong identity must not override a variant conflict");
-  return results;
-}
-
-const developmentMatchingTestResults = runDevelopmentMatchingTests();
 window.PriceAlertMatching = Object.freeze({
   normalizeTradeIdentifier,
   normalizeModelIdentifier,
@@ -286,45 +251,9 @@ window.PriceAlertMatching = Object.freeze({
   normalizeVariantValue,
   productNameSimilarity,
   compareVariantCompatibility,
-  compareProductIdentity,
-  developmentMatchingTestResults
+  compareProductIdentity
 });
 
-function runDevelopmentOfferTests() {
-  const product = products[0];
-  const validOffer = { ...product.offers[0], offerId:"test-valid", price:80, salePrice:80, regularPrice:100, currency:"USD", stockStatus:"in-stock", offerStatus:"sample-active" };
-  const unavailableOffer = { ...validOffer, offerId:"test-unavailable", price:50, salePrice:50, stockStatus:"out-of-stock" };
-  const invalidOffer = { ...validOffer, offerId:"test-invalid", price:"not-a-price", salePrice:null };
-  const missingPriceOffer = { ...validOffer, offerId:"test-missing", price:null, salePrice:null };
-  const duplicateOffer = { ...validOffer };
-  const incompatibleOffer = { ...validOffer, offerId:"test-wrong-variant", variantId:"different-variant", price:20, salePrice:20 };
-  const euroOffer = { ...validOffer, offerId:"test-eur", currency:"EUR", price:10, salePrice:10 };
-  const mixedOffers = [unavailableOffer, invalidOffer, missingPriceOffer, validOffer, duplicateOffer, incompatibleOffer, euroOffer];
-  const sortedUsdOffers = sortOffersByLowestPrice(mixedOffers, { product, currency:"USD" });
-  const results = {
-    lowestValidAvailable: bestAvailableOffer({ ...product, offers:mixedOffers }, "USD"),
-    unavailableIgnored: !sortedUsdOffers.includes(unavailableOffer),
-    invalidIgnored: !sortedUsdOffers.includes(invalidOffer),
-    missingPriceIgnored: !sortedUsdOffers.includes(missingPriceOffer),
-    saleSavingsAmount: calculateOfferSavingsAmount(validOffer),
-    saleSavingsPercent: calculateOfferSavingsPercent(validOffer),
-    duplicatesStable: sortedUsdOffers.filter(offer => offer.offerId === "test-valid").length === 2,
-    incompatibleVariantRejected: !sortedUsdOffers.includes(incompatibleOffer),
-    differentCurrencyExcluded: !sortedUsdOffers.includes(euroOffer)
-  };
-
-  console.assert(results.lowestValidAvailable === validOffer, "Offer test failed: lowest valid available price");
-  console.assert(results.unavailableIgnored, "Offer test failed: unavailable offer must be ignored");
-  console.assert(results.invalidIgnored, "Offer test failed: invalid price must be ignored");
-  console.assert(results.missingPriceIgnored, "Offer test failed: missing price must be ignored");
-  console.assert(results.saleSavingsAmount === 20 && results.saleSavingsPercent === 20, "Offer test failed: sale savings calculation");
-  console.assert(results.duplicatesStable, "Offer test failed: duplicate offers must sort safely");
-  console.assert(results.incompatibleVariantRejected, "Offer test failed: incompatible variant must be rejected");
-  console.assert(results.differentCurrencyExcluded, "Offer test failed: currencies must not be directly compared");
-  return results;
-}
-
-const developmentOfferTestResults = runDevelopmentOfferTests();
 window.PriceAlertOffers = Object.freeze({
   validOfferPrice,
   currentOfferPrice,
@@ -334,36 +263,13 @@ window.PriceAlertOffers = Object.freeze({
   isOfferCurrentlyAvailable,
   isOfferCompatibleWithProduct,
   sortOffersByLowestPrice,
-  bestAvailableOffer,
-  developmentOfferTestResults
+  bestAvailableOffer
 });
 
-function runDevelopmentLinkTests() {
-  const product = products[0];
-  const offer = product.offers[0];
-  const affiliate = resolveOfferDestination({ ...offer, affiliateUrl:"https://example.com/affiliate", productUrl:"https://example.com/product" }, product);
-  const direct = resolveOfferDestination({ ...offer, affiliateUrl:null, productUrl:"https://example.com/product" }, product);
-  const fallback = resolveOfferDestination({ ...offer, affiliateUrl:null, productUrl:"#" }, product);
-  const supportedRetailers = products.flatMap(item => item.offers).map(item => item.retailerId).filter((id, index, ids) => ids.indexOf(id) === index);
-  const results = {
-    affiliateFirst: affiliate && affiliate.linkType === "affiliate" && affiliate.url.includes("/affiliate"),
-    productSecond: direct && direct.linkType === "product" && direct.url.includes("/product"),
-    hashUsesSearch: fallback && fallback.linkType === "retailer-search" && fallback.url !== "#",
-    allRetailersSupported: supportedRetailers.every(retailerId => typeof RETAILER_SEARCH_URLS[retailerId] === "function")
-  };
-  console.assert(results.affiliateFirst, "Link test failed: affiliate URL must take priority");
-  console.assert(results.productSecond, "Link test failed: product URL must be used second");
-  console.assert(results.hashUsesSearch, "Link test failed: dead links must use retailer search");
-  console.assert(results.allRetailersSupported, "Link test failed: every catalog retailer needs a search URL");
-  return results;
-}
-
-const developmentLinkTestResults = runDevelopmentLinkTests();
 window.PriceAlertLinks = Object.freeze({
   validExternalUrl,
   retailerSearchUrl,
-  resolveOfferDestination,
-  developmentLinkTestResults
+  resolveOfferDestination
 });
 
 function loadSaved() {
@@ -371,7 +277,8 @@ function loadSaved() {
   catch { return []; }
 }
 function persistSaved() {
-  try { localStorage.setItem("priceAlertShoppingList", JSON.stringify(state.saved)); } catch {}
+  try { localStorage.setItem("priceAlertShoppingList", JSON.stringify(state.saved)); return true; }
+  catch { return false; }
 }
 
 function isValidMediaUrl(value) {
@@ -424,43 +331,12 @@ function fallbackProductImage(image) {
   return true;
 }
 
-function runDevelopmentMediaTests() {
-  const sampleProduct = products[0];
-  const syntheticImageUrl = "https://example.invalid/authorized-sample.png";
-  const placeholderMarkup = renderProductMedia(sampleProduct);
-  const futureImageProduct = {
-    ...sampleProduct,
-    media: { ...sampleProduct.media, primaryImage: syntheticImageUrl, imageAlt:"Authorized sample product image", imageSource:"development-test", imageLicenseOrPermission:"authorized", mediaStatus:"authorized" }
-  };
-  const imageMarkup = renderProductMedia(futureImageProduct);
-  const testContainer = document.createElement("div");
-  testContainer.innerHTML = imageMarkup.replace(` src="${syntheticImageUrl}"`, "");
-  const testImage = testContainer.querySelector(".product-image");
-  const fallbackApplied = fallbackProductImage(testImage);
-  const testPlaceholder = testContainer.querySelector(".product-placeholder");
-  const fallbackVisible = Boolean(testPlaceholder && !testPlaceholder.hidden);
-  const results = {
-    noImageUsesPlaceholder: placeholderMarkup.includes('data-media-kind="placeholder"'),
-    primaryImageRendersImage: imageMarkup.includes('class="product-image"') && imageMarkup.includes('loading="lazy"'),
-    failedImageUsesPlaceholder: Boolean(fallbackApplied && fallbackVisible && testImage && testImage.hidden),
-    imageAltPresent: Boolean(testImage && testImage.alt)
-  };
-
-  console.assert(results.noImageUsesPlaceholder, "Media test failed: missing image must use placeholder");
-  console.assert(results.primaryImageRendersImage, "Media test failed: primary image must render responsively");
-  console.assert(results.failedImageUsesPlaceholder, "Media test failed: broken image must fall back");
-  console.assert(results.imageAltPresent, "Media test failed: product image must have alt text");
-  return results;
-}
-
-const developmentMediaTestResults = runDevelopmentMediaTests();
 window.PriceAlertMedia = Object.freeze({
   isValidMediaUrl,
   isAuthorizedProductImage,
   productImageAlt,
   renderProductMedia,
-  fallbackProductImage,
-  developmentMediaTestResults
+  fallbackProductImage
 });
 
 function savedClass(id) { return state.saved.includes(id) ? " saved" : ""; }
@@ -476,7 +352,7 @@ function initializeOptions() {
 }
 
 function searchableText(product) {
-  return [product.id,product.slug,product.name,product.brand,product.modelNumber,product.category,product.description,...Object.values(product.specifications),...product.offers.flatMap(item => [item.retailerName,item.retailerProductId,item.retailerSku])].filter(Boolean).join(" ").toLowerCase();
+  return [product.id,product.slug,product.name,product.brand,product.modelNumber,product.category,product.description,...Object.values(product.specifications||{}),...(Array.isArray(product.offers)?product.offers:[]).flatMap(item => [item.retailerName,item.retailerProductId,item.retailerSku])].filter(Boolean).join(" ").toLowerCase();
 }
 function offerMatchesFilters(item, product) {
   if (!isOfferCurrentlyAvailable(item, product)) return false;
@@ -489,7 +365,7 @@ function filteredProducts() {
   const matches = products.filter(product => {
     if (query && !searchableText(product).includes(query)) return false;
     if (state.category && product.category !== state.category) return false;
-    const eligibleOffers = product.offers.filter(item => offerMatchesFilters(item, product));
+    const eligibleOffers = (Array.isArray(product.offers)?product.offers:[]).filter(item => offerMatchesFilters(item, product));
     if (!eligibleOffers.length) return false;
     const eligibleLowOffer = sortOffersByLowestPrice(eligibleOffers, { product })[0];
     const eligibleLow = eligibleLowOffer ? currentOfferPrice(eligibleLowOffer) : null;
@@ -504,15 +380,18 @@ function filteredProducts() {
 function renderResults({scroll=false}={}) {
   const matches = filteredProducts();
   $("#results").hidden = false;
-  $("#product-grid").innerHTML = matches.map(product => `
+  $("#product-grid").innerHTML = matches.map(product => {
+    const validOfferCount=sortOffersByLowestPrice(product.offers,{product}).length;
+    return `
     <article class="product-card">
       ${linkedProductMedia(product)}
       <div class="product-body"><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${productTitleMarkup(product)}</h3>
         <p class="product-meta">Model ${escapeHtml(product.modelNumber)} · ${escapeHtml(product.category)}</p>
-        <div class="product-price-row"><div class="from-price"><small>Lowest price</small><strong>${money(lowest(product))}</strong></div><span class="store-count">${product.offers.length} stores<br>offering it</span></div>
+        <div class="product-price-row"><div class="from-price"><small>Lowest price</small><strong>${money(lowest(product))}</strong></div><span class="store-count">${validOfferCount} valid retailer option${validOfferCount===1?"":"s"}</span></div>
         <div class="card-actions"><button class="button button-primary" type="button" data-compare="${product.id}">Compare Prices</button><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}" aria-label="${savedLabel(product.id)}" title="${savedLabel(product.id)}">♡</button></div>
       </div>
-    </article>`).join("");
+    </article>`;
+  }).join("");
   $("#empty-state").hidden = matches.length !== 0;
   $("#product-grid").hidden = matches.length === 0;
   const context = state.query ? ` for “${state.query}”` : state.category ? ` in ${state.category}` : "";
@@ -529,6 +408,7 @@ function resetFilters() {
 
 function renderDeals() {
   const deals = products.filter(product => discountAmount(product) > 0).sort((a,b) => discountAmount(b)-discountAmount(a)).slice(0,3);
+  if (!deals.length) { $("#deal-grid").innerHTML='<p class="section-empty">No verified price highlights are available right now. Check retailer details before purchasing.</p>'; return; }
   $("#deal-grid").innerHTML = deals.map(product => {
     const bestOffer = lowestOffer(product);
     const savings = Math.round(calculateOfferSavingsPercent(bestOffer));
@@ -539,13 +419,18 @@ function renderDeals() {
 function showComparison(id) {
   const product = products.find(item => item.id === id); if (!product) return;
   const offers = sortOffersByLowestPrice(product.offers, { product });
-  const historyPrices = product.priceHistory.map(entry => entry.price);
+  if (!offers.length) {
+    $("#comparison-content").innerHTML=`<div class="panel unavailable-state"><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>No valid retailer offers are available for this product right now. Check again after retailer information is refreshed.</p><button class="button button-secondary" type="button" data-close-comparison>Close comparison</button></div>`;
+    $("#comparison").hidden=false; $("#comparison").scrollIntoView({behavior:"smooth",block:"start"}); return;
+  }
+  const historyEntries=(Array.isArray(product.priceHistory)?product.priceHistory:[]).filter(entry=>validOfferPrice(entry.price)!==null);
+  const historyPrices = historyEntries.map(entry => entry.price);
   const minHistory = Math.min(...historyPrices), maxHistory = Math.max(...historyPrices);
   const range = Math.max(maxHistory-minHistory,1);
   $("#comparison-content").innerHTML = `
     <div class="comparison-top">${renderProductMedia(product, { lazy:false })}<div><p class="product-brand">${escapeHtml(product.brand)} · ${escapeHtml(product.category)}</p><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>Model ${escapeHtml(product.modelNumber)} · Item ${escapeHtml(product.specifications.itemNumber)} · UPC ${escapeHtml(product.specifications.upc)}</p><p>${escapeHtml(product.description)}</p></div><div class="comparison-actions"><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}">♡ ${state.saved.includes(product.id)?"Saved":"Save to Shopping List"}</button><button class="text-button" type="button" data-close-comparison>Close comparison</button></div></div>
     <div class="comparison-grid"><div class="panel"><h3>Compare retailer offers</h3><div class="offer-list">${offers.map((item,index) => { const savings = calculateOfferSavingsAmount(item); const destination = resolveOfferDestination(item, product); return `<article class="offer-card${index===0?" best":""}"><div><span class="retailer-name">${escapeHtml(item.retailerName)}</span>${index===0?'<span class="best-badge">Best Price</span>':""}</div><div><div>${escapeHtml(item.availability)}</div><div class="offer-detail">${escapeHtml(item.shipping || "Shipping details vary")}${savings > 0 ? ` · Save ${money(savings, item.currency)}` : ""}</div></div><div class="offer-price">${money(currentOfferPrice(item), item.currency)}</div>${destination ? `<a class="button button-primary" href="${escapeHtml(destination.url)}" target="_blank" rel="noopener noreferrer sponsored" data-retailer-link="${destination.linkType}">${escapeHtml(destination.label)}</a>` : ""}</article>`; }).join("")}</div></div>
-    <aside class="panel"><h3>Price history</h3><div class="history-chart" aria-label="Six-month price history">${product.priceHistory.map((entry,index) => `<div class="history-bar" style="--height:${35+((entry.price-minHistory)/range)*65}%" data-price="${money(entry.price)}" title="${escapeHtml(entry.label)}: ${money(entry.price)}"></div>`).join("")}</div><div class="history-labels"><span>6 months ago</span><span>Current</span></div>
+    <aside class="panel"><h3>Price history</h3>${historyEntries.length?`<div class="history-chart" aria-label="Recorded price history">${historyEntries.map(entry => `<div class="history-bar" style="--height:${35+((entry.price-minHistory)/range)*65}%" data-price="${money(entry.price)}" title="${escapeHtml(entry.label||entry.recordedAt||"")}: ${money(entry.price)}"></div>`).join("")}</div><div class="history-labels"><span>Earlier</span><span>Current</span></div>`:'<p class="section-empty">No recorded price history is available yet.</p>'}
       <div data-target-alert-mount></div>
     </aside></div>`;
   alertStorage.mountTargetAlert($("#comparison-content [data-target-alert-mount]"), { product, currentLowestPrice:currentOfferPrice(offers[0]), currency:offers[0].currency });
@@ -555,9 +440,9 @@ function showComparison(id) {
 
 function toggleSave(id) {
   const index = state.saved.indexOf(id);
-  if (index >= 0) { state.saved.splice(index,1); showToast("Removed from your shopping list."); }
-  else { state.saved.push(id); showToast("Saved to your shopping list."); }
-  persistSaved(); renderShoppingList(); refreshSaveButtons();
+  if (index >= 0) state.saved.splice(index,1); else state.saved.push(id);
+  if (!persistSaved()) { if(index>=0)state.saved.splice(index,0,id);else state.saved.pop(); showToast("This browser could not save your Shopping List."); return; }
+  showToast(index>=0?"Removed from your shopping list.":"Saved to your shopping list."); renderShoppingList(); refreshSaveButtons();
 }
 function refreshSaveButtons() {
   document.querySelectorAll("[data-save]").forEach(button => {
@@ -575,10 +460,9 @@ function renderShoppingList() {
 }
 
 const dialogCopy = {
-  about:["About Price Alert","Price Alert helps shoppers find products, compare retailer offers, review price history, and organize purchase decisions."],
-  privacy:["Privacy","Shopping List selections are stored only in your browser using localStorage. Price-alert form entries are processed within this page and are not transmitted to Price Alert."],
-  terms:["Terms","Product details, prices, availability, shipping, and destination links can change. Verify all offer information directly with the retailer before making a purchase."],
-  contact:["Contact","For questions about Price Alert, please contact the site operator."]
+  about:["About Price Alert","Price Alert helps shoppers search products, compare retailer options, review recorded price history, and organize purchase decisions. Retailers control their listings and final transaction details."],
+  privacy:["Privacy","Shopping List selections and price-alert entries, including the email address you enter, are stored only in this browser on this device. They are not transmitted to Price Alert, and email delivery is not active. Clearing this site's browser storage removes these locally saved entries."],
+  terms:["Terms","Prices, availability, shipping, and destination links can change. Verify the final price and availability directly with the retailer before purchasing. Price Alert does not sell, stock, or ship retailer merchandise; the retailer controls the final transaction."]
 };
 let toastTimer;
 function showToast(message) { const toast=$("#toast"); toast.textContent=message; toast.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.hidden=true,2600); }
@@ -589,8 +473,8 @@ $("#category-grid").addEventListener("click", event => { const button=event.targ
 ["category-filter","retailer-filter","availability-filter","sort-select"].forEach(id => $("#"+id).addEventListener("change", event => { const keys={"category-filter":"category","retailer-filter":"retailer","availability-filter":"availability","sort-select":"sort"}; state[keys[id]]=event.target.value; renderResults(); }));
 ["min-price","max-price"].forEach(id => $("#"+id).addEventListener("input", event => { state[id==="min-price"?"min":"max"]=event.target.value; renderResults(); }));
 $("#clear-search").addEventListener("click",()=>{ resetFilters(); $("#results").hidden=true; $("#comparison").hidden=true; $("#top").scrollIntoView({behavior:"smooth"}); });
-$("#filter-toggle").addEventListener("click",()=>$("#filters").classList.add("open"));
-$("#filter-close").addEventListener("click",()=>$("#filters").classList.remove("open"));
+$("#filter-toggle").addEventListener("click",()=>{ $("#filters").classList.add("open"); $("#filter-toggle").setAttribute("aria-expanded","true"); $("#filter-close").focus(); });
+$("#filter-close").addEventListener("click",()=>{ $("#filters").classList.remove("open"); $("#filter-toggle").setAttribute("aria-expanded","false"); $("#filter-toggle").focus(); });
 $("#menu-toggle").addEventListener("click",event=>{ const open=$("#main-nav").classList.toggle("open"); event.currentTarget.setAttribute("aria-expanded",open); });
 $("#main-nav").addEventListener("click",()=>{ $("#main-nav").classList.remove("open"); $("#menu-toggle").setAttribute("aria-expanded","false"); });
 
@@ -601,7 +485,7 @@ document.addEventListener("click", event => {
   const dialogButton=event.target.closest("[data-dialog]"); if(dialogButton) { const [title,copy]=dialogCopy[dialogButton.dataset.dialog]; $("#dialog-content").innerHTML=`<h2 id="dialog-title">${title}</h2><p>${copy}</p>`; $("#info-dialog").showModal(); }
 });
 document.addEventListener("error", event => { if (event.target && event.target.matches && event.target.matches(".product-image")) fallbackProductImage(event.target); }, true);
-$("#clear-list").addEventListener("click",()=>{ state.saved=[]; persistSaved(); renderShoppingList(); showToast("Shopping list cleared."); });
+$("#clear-list").addEventListener("click",()=>{ const previous=[...state.saved]; state.saved=[]; if(!persistSaved()){state.saved=previous;showToast("This browser could not update your Shopping List.");return;} renderShoppingList(); showToast("Shopping list cleared."); });
 $("#dialog-close").addEventListener("click",()=>$("#info-dialog").close());
 $("#info-dialog").addEventListener("click",event=>{ if(event.target===$("#info-dialog")) $("#info-dialog").close(); });
 

@@ -17,7 +17,9 @@ jobs:
         with:
           node-version: "22"
       - name: Run monitoring tests
-        run: node scripts/tests/price-monitoring.test.js
+        run: |
+          node scripts/tests/price-monitoring.test.js
+          node scripts/tests/launch-readiness.test.js
       - name: Exercise sample monitoring with mock email only
         run: node scripts/run-price-monitor.js --report artifacts/price-monitor-development-report.json
       - name: Verify report contains no email addresses

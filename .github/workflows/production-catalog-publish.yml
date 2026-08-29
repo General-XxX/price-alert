@@ -34,6 +34,8 @@ jobs:
           APPROVED_FEED_PATH: ${{ vars.PRICE_ALERT_APPROVED_FEED_PATH }}
           APPROVED_ADAPTER: ${{ vars.PRICE_ALERT_APPROVED_ADAPTER }}
         run: node scripts/update-catalog.js --mode publish --adapter "${APPROVED_ADAPTER:-generic-file}" --feed "$APPROVED_FEED_PATH" --report artifacts/catalog-publish-report.json --output data/catalog.generated.json
+      - name: Generate approved product sitemap candidate
+        run: node scripts/generate-sitemap.js --catalog data/catalog.generated.json --output artifacts/sitemap.generated.xml
       - name: Upload validated output for review
         uses: actions/upload-artifact@v4
         with:
@@ -41,5 +43,6 @@ jobs:
           path: |
             artifacts/catalog-publish-report.json
             data/catalog.generated.json
+            artifacts/sitemap.generated.xml
           if-no-files-found: error
           retention-days: 7

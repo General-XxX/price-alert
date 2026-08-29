@@ -8,6 +8,11 @@ const httpUrl = value => {
   try { return ["http:", "https:"].includes(new URL(value).protocol); } catch { return false; }
 };
 const numericPrice = value => value === null || value === undefined || value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0);
+function containsPrivateCustomerData(value) {
+  if (Array.isArray(value)) return value.some(containsPrivateCustomerData);
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, item]) => /^(email|customerEmail|customer_email|password)$/i.test(key) || containsPrivateCustomerData(item));
+}
 
 function validateApproval(metadata) {
   const errors = [];
@@ -29,6 +34,7 @@ function hasIdentity(product) {
 
 function validateProduct(product, metadata, index, enforceSourceAuthorization = false) {
   const errors = [], prefix = `Product ${product.id || index + 1}`;
+  if (containsPrivateCustomerData(product)) errors.push(`${prefix}: customer or credential fields cannot enter the public catalog.`);
   if (!normalize(product.id) || !normalize(product.name) || !hasIdentity(product)) errors.push(`${prefix}: required product identity is incomplete.`);
   if (BLOCKED_MARKERS.test(product.dataStatus || "") || product.dataStatus !== "production-approved") errors.push(`${prefix}: dataStatus must be 'production-approved'.`);
   const variants = Array.isArray(product.variants) ? product.variants : [];
@@ -69,4 +75,4 @@ function validatePublish({ metadata, products, incomingProducts = [], report }) 
   return { valid:errors.length === 0, errors };
 }
 
-module.exports = { validateApproval, validateProduct, validatePublish };
+module.exports = { containsPrivateCustomerData, validateApproval, validateProduct, validatePublish };

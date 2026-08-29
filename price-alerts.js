@@ -103,7 +103,7 @@
       <div class="target-value" aria-live="polite"><output data-target-output>${money(selected,currency)}</output></div>
       <input class="target-slider" data-target-slider type="range" min="${minimum}" max="${maximum}" step="0.01" value="${selected}" aria-label="Target price">
       <div class="target-quick-actions" aria-label="Quick target prices"><button type="button" data-target-percent="5">5% lower</button><button type="button" data-target-percent="10" class="active">10% lower</button><button type="button" data-target-percent="20">20% lower</button></div>
-      <p class="target-explanation">Price Alert will notify you if any matched retailer reaches or falls below your target price.</p>
+      <p class="target-explanation">This target applies across all matched retailers. It is saved privately in this browser; email delivery is not currently active.</p>
       <form class="target-alert-form" data-target-alert-form novalidate><label><span>Email address</span><input type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label><button class="button button-primary" type="submit">Set Price Alert</button></form>
       <p class="target-alert-message" data-target-message role="status" hidden></p>
     </section>`;
@@ -120,26 +120,9 @@
     const quickButtons = [...alert.querySelectorAll("[data-target-percent]")];
     slider.addEventListener("input", () => { output.textContent = money(Number(slider.value),currency); quickButtons.forEach(button => button.classList.remove("active")); });
     quickButtons.forEach(button => button.addEventListener("click", () => { slider.value=Math.min(Number(slider.max),Math.max(Number(slider.min),targetPriceValue(Number(alert.dataset.currentPrice),Number(button.dataset.targetPercent)))); output.textContent=money(Number(slider.value),currency); quickButtons.forEach(item=>item.classList.toggle("active",item===button)); }));
-    alert.querySelector("[data-target-alert-form]").addEventListener("submit", event => { event.preventDefault(); const email=event.currentTarget.elements.email; const message=alert.querySelector("[data-target-message]"); const result=saveProductAlert({productId:alert.dataset.productId,variantId:alert.dataset.variantId||null,targetPrice:slider.value,email:email.value,currency,currentLowestPrice:alert.dataset.currentPrice}); message.textContent=result.ok?"Price alert saved on this device. Email notifications will be enabled when the Price Alert notification service launches.":result.error; message.classList.toggle("error",!result.ok); message.hidden=false; if(!result.ok) email.focus(); });
+    alert.querySelector("[data-target-alert-form]").addEventListener("submit", event => { event.preventDefault(); const email=event.currentTarget.elements.email; const message=alert.querySelector("[data-target-message]"); const result=saveProductAlert({productId:alert.dataset.productId,variantId:alert.dataset.variantId||null,targetPrice:slider.value,email:email.value,currency,currentLowestPrice:alert.dataset.currentPrice}); message.textContent=result.ok?"Price alert saved privately on this device. No email was sent; email delivery requires a secure notification service.":result.error; message.classList.toggle("error",!result.ok); message.hidden=false; if(!result.ok) email.focus(); });
     return true;
   }
 
-  const developmentAlertTests = (() => {
-    const valid = createAlertRecord({ productId:"test-product", variantId:"test-variant", targetPrice:90, email:"Shopper@Example.com", currency:"USD", currentLowestPrice:100 });
-    const invalidEmail = createAlertRecord({ productId:"test-product", targetPrice:90, email:"invalid", currency:"USD", currentLowestPrice:100 });
-    const invalidTarget = createAlertRecord({ productId:"test-product", targetPrice:100, email:"shopper@example.com", currency:"USD", currentLowestPrice:100 });
-    const results = {
-      recordShape: valid.ok && ["productId","variantId","targetPrice","email","currency","currentLowestPrice","createdAt","active","status"].every(key => Object.prototype.hasOwnProperty.call(valid.alert,key)),
-      emailNormalized: valid.ok && valid.alert.email === "shopper@example.com",
-      invalidEmailRejected: !invalidEmail.ok,
-      targetMustBeLower: !invalidTarget.ok
-    };
-    console.assert(results.recordShape, "Alert test failed: backend-ready record shape");
-    console.assert(results.emailNormalized, "Alert test failed: email normalization");
-    console.assert(results.invalidEmailRejected, "Alert test failed: email validation");
-    console.assert(results.targetMustBeLower, "Alert test failed: target price validation");
-    return results;
-  })();
-
-  window.PriceAlertStorage = Object.freeze({ STORAGE_KEY, BrowserAlertStore, browserAlertStore, validEmail, validMoney, loadAlerts, createAlertRecord, saveProductAlert, targetPriceValue, renderTargetAlert, mountTargetAlert, developmentAlertTests });
+  window.PriceAlertStorage = Object.freeze({ STORAGE_KEY, BrowserAlertStore, browserAlertStore, validEmail, validMoney, loadAlerts, createAlertRecord, saveProductAlert, targetPriceValue, renderTargetAlert, mountTargetAlert });
 }());
