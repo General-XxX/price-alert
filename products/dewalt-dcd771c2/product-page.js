@@ -34,29 +34,6 @@
   const offers = product.offers.filter(validOffer).filter(offer => offer.currency === "USD").sort((first, second) => currentPrice(first) - currentPrice(second));
   const bestOffer = offers[0];
 
-  function targetPriceValue(current, percent = 10) {
-    return Math.max(.01, Number((current * (1 - percent / 100)).toFixed(2)));
-  }
-
-  function targetAlertMarkup() {
-    const current = currentPrice(bestOffer);
-    const variant = product.variants.find(item => item.isDefaultVariant) || product.variants[0] || null;
-    const minimum = Math.max(.01, Number((current * .25).toFixed(2)));
-    const maximum = Math.max(minimum, Number((current - .01).toFixed(2)));
-    const selected = Math.min(maximum, Math.max(minimum, targetPriceValue(current)));
-    return `<section class="target-alert" data-product-alert data-product-id="${escapeHtml(product.id)}" data-variant-id="${escapeHtml(variant ? variant.variantId : "")}" data-current-price="${current}" data-currency="${escapeHtml(bestOffer.currency)}" aria-labelledby="target-alert-title">
-      <div class="target-alert-price"><span>Current lowest available price</span><strong>${money(current,bestOffer.currency)}</strong></div>
-      <h2 id="target-alert-title">Target Price Alert</h2>
-      <p class="target-prompt">Alert me when the price drops to:</p>
-      <div class="target-value" aria-live="polite"><output data-target-output>${money(selected,bestOffer.currency)}</output></div>
-      <input class="target-slider" data-target-slider type="range" min="${minimum}" max="${maximum}" step="0.01" value="${selected}" aria-label="Target price">
-      <div class="target-quick-actions" aria-label="Quick target prices"><button type="button" data-target-percent="5">5% lower</button><button type="button" data-target-percent="10" class="active">10% lower</button><button type="button" data-target-percent="20">20% lower</button></div>
-      <p class="target-explanation">Price Alert will notify you if any matched retailer reaches or falls below your target price.</p>
-      <form class="target-alert-form" data-target-alert-form novalidate><label><span>Email address</span><input type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label><button class="button button-primary" type="submit">Set Price Alert</button></form>
-      <p class="target-alert-message" data-target-message role="status" hidden></p>
-    </section>`;
-  }
-
   function validImageUrl(value) {
     if (typeof value !== "string" || !value.trim()) return false;
     try { return ["http:", "https:"].includes(new URL(value, document.baseURI).protocol); }
@@ -104,7 +81,7 @@
     $("#product-media").innerHTML = mediaMarkup();
     $("#lowest-price").textContent = bestOffer ? money(currentPrice(bestOffer), bestOffer.currency) : "Check retailers";
     $("#offer-count").textContent = `${offers.length} retailer option${offers.length === 1 ? "" : "s"}`;
-    $("#target-price-alert").innerHTML = targetAlertMarkup();
+    alertStorage.mountTargetAlert($("#target-price-alert"), { product, currentLowestPrice:currentPrice(bestOffer), currency:bestOffer.currency });
     $("#specification-list").innerHTML = Object.entries(product.specifications).filter(([key, value]) => key !== "visualMark" && value !== null && value !== "").map(([key, value]) => `<div><dt>${escapeHtml(specificationLabel(key))}</dt><dd>${escapeHtml(displayValue(value))}</dd></div>`).join("");
     $("#offer-list").innerHTML = offers.map((offer, index) => {
       const destination = linkHelpers.resolveOfferDestination(offer, product);
@@ -149,9 +126,6 @@
   document.addEventListener("error", event => { if (event.target && event.target.matches && event.target.matches(".product-image")) useMediaFallback(event.target); }, true);
   $("#save-product").addEventListener("click", toggleSaved);
   $("#shopping-list-items").addEventListener("click", event => { if (event.target.closest("[data-remove-product]")) toggleSaved(); });
-  $("#target-price-alert").addEventListener("input", event => { if(!event.target.matches("[data-target-slider]")) return; const alert=event.target.closest("[data-product-alert]"); alert.querySelector("[data-target-output]").textContent=money(Number(event.target.value),alert.dataset.currency); alert.querySelectorAll("[data-target-percent]").forEach(button=>button.classList.remove("active")); });
-  $("#target-price-alert").addEventListener("click", event => { const quick=event.target.closest("[data-target-percent]"); if(!quick)return; const alert=quick.closest("[data-product-alert]"); const slider=alert.querySelector("[data-target-slider]"); const current=Number(alert.dataset.currentPrice); slider.value=Math.min(Number(slider.max),Math.max(Number(slider.min),targetPriceValue(current,Number(quick.dataset.targetPercent)))); alert.querySelector("[data-target-output]").textContent=money(Number(slider.value),alert.dataset.currency); alert.querySelectorAll("[data-target-percent]").forEach(button=>button.classList.toggle("active",button===quick)); });
-  $("#target-price-alert").addEventListener("submit", event => { if(!event.target.matches("[data-target-alert-form]"))return; event.preventDefault(); const alert=event.target.closest("[data-product-alert]"); const email=event.target.elements.email; const message=alert.querySelector("[data-target-message]"); const result=alertStorage.saveProductAlert({productId:alert.dataset.productId,variantId:alert.dataset.variantId||null,targetPrice:alert.querySelector("[data-target-slider]").value,email:email.value,currency:alert.dataset.currency,currentLowestPrice:alert.dataset.currentPrice}); message.textContent=result.ok?"Price alert saved on this device. Email notifications will be enabled when the Price Alert notification service launches.":result.error; message.classList.toggle("error",!result.ok); message.hidden=false; if(!result.ok) email.focus(); });
 
   renderProduct();
   renderShoppingList();

@@ -60,6 +60,50 @@
     }
   }
 
+  const escapeHtml = value => String(value).replace(/[&<>'"]/g, character => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" })[character]);
+  const money = (value, currency) => new Intl.NumberFormat("en-US", { style:"currency", currency:currency || "USD" }).format(value);
+
+  function targetPriceValue(currentPrice, percent = 10) {
+    return Math.max(.01, Number((currentPrice * (1 - percent / 100)).toFixed(2)));
+  }
+
+  function renderTargetAlert(product, currentLowestPrice, currency = "USD") {
+    const current = validMoney(currentLowestPrice);
+    if (!product || current === null) return "";
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    const variant = variants.find(item => item.isDefaultVariant) || variants[0] || null;
+    const minimum = Math.max(.01, Number((current * .25).toFixed(2)));
+    const maximum = Math.max(minimum, Number((current - .01).toFixed(2)));
+    const selected = Math.min(maximum, Math.max(minimum, targetPriceValue(current)));
+    const titleId = `target-alert-title-${String(product.id).replace(/[^a-z0-9_-]/gi, "-")}`;
+    return `<section class="target-alert" data-product-alert data-product-id="${escapeHtml(product.id)}" data-variant-id="${escapeHtml(variant ? variant.variantId : "")}" data-current-price="${current}" data-currency="${escapeHtml(currency)}" aria-labelledby="${titleId}">
+      <div class="target-alert-price"><span>Current lowest available price</span><strong>${money(current,currency)}</strong></div>
+      <h3 id="${titleId}">Target Price Alert</h3>
+      <p class="target-prompt">Alert me when the price drops to:</p>
+      <div class="target-value" aria-live="polite"><output data-target-output>${money(selected,currency)}</output></div>
+      <input class="target-slider" data-target-slider type="range" min="${minimum}" max="${maximum}" step="0.01" value="${selected}" aria-label="Target price">
+      <div class="target-quick-actions" aria-label="Quick target prices"><button type="button" data-target-percent="5">5% lower</button><button type="button" data-target-percent="10" class="active">10% lower</button><button type="button" data-target-percent="20">20% lower</button></div>
+      <p class="target-explanation">Price Alert will notify you if any matched retailer reaches or falls below your target price.</p>
+      <form class="target-alert-form" data-target-alert-form novalidate><label><span>Email address</span><input type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label><button class="button button-primary" type="submit">Set Price Alert</button></form>
+      <p class="target-alert-message" data-target-message role="status" hidden></p>
+    </section>`;
+  }
+
+  function mountTargetAlert(container, { product, currentLowestPrice, currency = "USD" }) {
+    const mount = typeof container === "string" ? document.querySelector(container) : container;
+    if (!mount) return false;
+    mount.innerHTML = renderTargetAlert(product, currentLowestPrice, currency);
+    const alert = mount.querySelector("[data-product-alert]");
+    if (!alert) return false;
+    const slider = alert.querySelector("[data-target-slider]");
+    const output = alert.querySelector("[data-target-output]");
+    const quickButtons = [...alert.querySelectorAll("[data-target-percent]")];
+    slider.addEventListener("input", () => { output.textContent = money(Number(slider.value),currency); quickButtons.forEach(button => button.classList.remove("active")); });
+    quickButtons.forEach(button => button.addEventListener("click", () => { slider.value=Math.min(Number(slider.max),Math.max(Number(slider.min),targetPriceValue(Number(alert.dataset.currentPrice),Number(button.dataset.targetPercent)))); output.textContent=money(Number(slider.value),currency); quickButtons.forEach(item=>item.classList.toggle("active",item===button)); }));
+    alert.querySelector("[data-target-alert-form]").addEventListener("submit", event => { event.preventDefault(); const email=event.currentTarget.elements.email; const message=alert.querySelector("[data-target-message]"); const result=saveProductAlert({productId:alert.dataset.productId,variantId:alert.dataset.variantId||null,targetPrice:slider.value,email:email.value,currency,currentLowestPrice:alert.dataset.currentPrice}); message.textContent=result.ok?"Price alert saved on this device. Email notifications will be enabled when the Price Alert notification service launches.":result.error; message.classList.toggle("error",!result.ok); message.hidden=false; if(!result.ok) email.focus(); });
+    return true;
+  }
+
   const developmentAlertTests = (() => {
     const valid = createAlertRecord({ productId:"test-product", variantId:"test-variant", targetPrice:90, email:"Shopper@Example.com", currency:"USD", currentLowestPrice:100 });
     const invalidEmail = createAlertRecord({ productId:"test-product", targetPrice:90, email:"invalid", currency:"USD", currentLowestPrice:100 });
@@ -77,5 +121,5 @@
     return results;
   })();
 
-  window.PriceAlertStorage = Object.freeze({ STORAGE_KEY, validEmail, validMoney, loadAlerts, createAlertRecord, saveProductAlert, developmentAlertTests });
+  window.PriceAlertStorage = Object.freeze({ STORAGE_KEY, validEmail, validMoney, loadAlerts, createAlertRecord, saveProductAlert, targetPriceValue, renderTargetAlert, mountTargetAlert, developmentAlertTests });
 }());
