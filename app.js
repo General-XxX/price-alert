@@ -293,8 +293,7 @@ function isValidMediaUrl(value) {
 }
 
 function isAuthorizedProductImage(media) {
-  if (!media || !isValidMediaUrl(media.primaryImage)) return false;
-  return Boolean(media.imageSource && /(authorized|licensed|permission-granted|owned-asset|public-domain|affiliate-feed|manufacturer-feed|retailer-feed)/i.test(media.imageLicenseOrPermission || ""));
+  return Boolean(window.PriceAlertMediaResolver&&window.PriceAlertMediaResolver.isAuthorized(media));
 }
 
 function productImageAlt(product) {
@@ -313,23 +312,12 @@ function renderProductMedia(product, { lazy = true } = {}) {
     return `<div class="product-visual" data-category="${escapeHtml(product.category)}" data-media-kind="placeholder" role="img" aria-label="${escapeHtml(placeholderLabel)}"><span class="product-placeholder">${escapeHtml(placeholderText)}</span></div>`;
   }
 
-  return `<div class="product-visual" data-category="${escapeHtml(product.category)}" data-media-kind="image"><img class="product-image" src="${escapeHtml(media.primaryImage)}" alt="${escapeHtml(altText)}" loading="${lazy ? "lazy" : "eager"}" decoding="async"><span class="product-placeholder" aria-hidden="true" hidden>${escapeHtml(placeholderText)}</span></div>`;
+  return `<div class="product-visual" data-category="${escapeHtml(product.category)}" data-media-kind="image"><img class="product-image" src="${escapeHtml(media.primaryImage)}" alt="${escapeHtml(altText)}" loading="${lazy ? "lazy" : "eager"}" decoding="async" width="320" height="240"><span class="product-placeholder" aria-hidden="true" hidden>${escapeHtml(placeholderText)}</span></div>`;
 }
 
 function fallbackProductImage(image) {
   if (!image || !image.matches || !image.matches(".product-image")) return false;
-  const container = image.closest(".product-visual");
-  const placeholder = container && container.querySelector(".product-placeholder");
-  if (!container || !placeholder) return false;
-
-  image.hidden = true;
-  image.removeAttribute("src");
-  placeholder.hidden = false;
-  placeholder.setAttribute("aria-hidden", "false");
-  container.dataset.mediaKind = "placeholder";
-  container.setAttribute("role", "img");
-  container.setAttribute("aria-label", `Product visual for ${image.alt || "product image"}`);
-  return true;
+  return window.PriceAlertMediaResolver.fallbackImageElement(image,image.alt||"product image");
 }
 
 window.PriceAlertMedia = Object.freeze({
@@ -367,7 +355,7 @@ function filteredProducts() {
     if (query && !searchableText(product).includes(query)) return false;
     if (state.category && product.category !== state.category) return false;
     const eligibleOffers = (Array.isArray(product.offers)?product.offers:[]).filter(item => offerMatchesFilters(item, product));
-    if (!eligibleOffers.length) return false;
+    if (!eligibleOffers.length) return state.retailer===""&&state.availability===""&&state.min===""&&state.max==="";
     const eligibleLowOffer = sortOffersByLowestPrice(eligibleOffers, { product })[0];
     const eligibleLow = eligibleLowOffer ? currentOfferPrice(eligibleLowOffer) : null;
     if (eligibleLow === null) return false;
@@ -387,9 +375,9 @@ function renderResults({scroll=false}={}) {
     <article class="product-card">
       ${linkedProductMedia(product)}
       <div class="product-body"><p class="product-brand">${escapeHtml(product.brand)}</p><h3>${productTitleMarkup(product)}</h3>
-        <p class="product-meta">Model ${escapeHtml(product.modelNumber)} · ${escapeHtml(product.category)}</p>
-        <div class="product-price-row"><div class="from-price"><small>Lowest price</small><strong>${money(lowest(product))}</strong></div><span class="store-count">${validOfferCount} valid retailer option${validOfferCount===1?"":"s"}</span></div>
-        <div class="card-actions"><button class="button button-primary" type="button" data-compare="${product.id}">Compare Prices</button><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}" aria-label="${savedLabel(product.id)}" title="${savedLabel(product.id)}">♡</button></div>
+        <p class="product-meta">${product.modelNumber?`Model ${escapeHtml(product.modelNumber)} · `:""}${escapeHtml(product.category)}</p>
+        <div class="product-price-row"><div class="from-price"><small>${validOfferCount?"Lowest price":"Retailer pricing"}</small><strong>${validOfferCount?money(lowest(product)):"Unavailable"}</strong></div><span class="store-count">${validOfferCount} valid retailer option${validOfferCount===1?"":"s"}</span></div>
+        <div class="card-actions">${validOfferCount?`<button class="button button-primary" type="button" data-compare="${product.id}">Compare Prices</button>`:`<a class="button button-primary" href="${productDetailPath(product)}">View product details</a>`}<button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}" aria-label="${savedLabel(product.id)}" title="${savedLabel(product.id)}">♡</button></div>
       </div>
     </article>`;
   }).join("");
@@ -429,7 +417,7 @@ function showComparison(id) {
   const minHistory = Math.min(...historyPrices), maxHistory = Math.max(...historyPrices);
   const range = Math.max(maxHistory-minHistory,1);
   $("#comparison-content").innerHTML = `
-    <div class="comparison-top">${renderProductMedia(product, { lazy:false })}<div><p class="product-brand">${escapeHtml(product.brand)} · ${escapeHtml(product.category)}</p><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>Model ${escapeHtml(product.modelNumber)} · Item ${escapeHtml(product.specifications.itemNumber)} · UPC ${escapeHtml(product.specifications.upc)}</p><p>${escapeHtml(product.description)}</p></div><div class="comparison-actions"><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}">♡ ${state.saved.includes(product.id)?"Saved":"Save to Shopping List"}</button><button class="text-button" type="button" data-close-comparison>Close comparison</button></div></div>
+    <div class="comparison-top">${renderProductMedia(product, { lazy:false })}<div><p class="product-brand">${escapeHtml(product.brand)} · ${escapeHtml(product.category)}</p><h2 id="comparison-title">${escapeHtml(product.name)}</h2><p>${[["Model",product.modelNumber],["Item",product.specifications.itemNumber],["UPC",product.specifications.upc]].filter(([,value])=>value).map(([label,value])=>`${label} ${escapeHtml(value)}`).join(" · ")}</p><p>${escapeHtml(product.description)}</p></div><div class="comparison-actions"><button class="button button-secondary save-button${savedClass(product.id)}" type="button" data-save="${product.id}">♡ ${state.saved.includes(product.id)?"Saved":"Save to Shopping List"}</button><button class="text-button" type="button" data-close-comparison>Close comparison</button></div></div>
     <div class="comparison-grid"><div class="panel"><h3>Compare retailer offers</h3><div class="offer-list">${offers.map((item,index) => { const savings = calculateOfferSavingsAmount(item); const destination = resolveOfferDestination(item, product); return `<article class="offer-card${index===0?" best":""}"><div><span class="retailer-name">${escapeHtml(item.retailerName)}</span>${index===0?'<span class="best-badge">Best Price</span>':""}</div><div><div>${escapeHtml(item.availability)}</div><div class="offer-detail">${escapeHtml(item.shipping || "Shipping details vary")}${savings > 0 ? ` · Save ${money(savings, item.currency)}` : ""}</div></div><div class="offer-price">${money(currentOfferPrice(item), item.currency)}</div>${destinationMarkup(destination)}</article>`; }).join("")}</div></div>
     <aside class="panel"><h3>Price history</h3>${historyEntries.length?`<div class="history-chart" aria-label="Recorded price history">${historyEntries.map(entry => `<div class="history-bar" style="--height:${35+((entry.price-minHistory)/range)*65}%" data-price="${money(entry.price)}" title="${escapeHtml(entry.label||entry.recordedAt||"")}: ${money(entry.price)}"></div>`).join("")}</div><div class="history-labels"><span>Earlier</span><span>Current</span></div>`:'<p class="section-empty">No recorded price history is available yet.</p>'}
       <div data-target-alert-mount></div>
@@ -456,7 +444,7 @@ function refreshSaveButtons() {
 function renderShoppingList() {
   const savedProducts = state.saved.map(id => products.find(product => product.id===id)).filter(Boolean);
   $("#clear-list").hidden = !savedProducts.length;
-  $("#shopping-list-items").innerHTML = savedProducts.length ? savedProducts.map(product => `<article class="saved-item"><div><strong>${escapeHtml(product.brand)} ${escapeHtml(product.name)}</strong><small>From ${money(lowest(product))} · ${escapeHtml(product.category)}</small></div><button class="remove-item" type="button" data-save="${product.id}" aria-label="Remove ${escapeHtml(product.name)}">×</button></article>`).join("") : '<p class="list-empty">Your shopping list is empty. Save a product to keep it here.</p>';
+  $("#shopping-list-items").innerHTML = savedProducts.length ? savedProducts.map(product => `<article class="saved-item"><div><strong>${escapeHtml(product.brand)} ${escapeHtml(product.name)}</strong><small>${lowest(product)!==null?`From ${money(lowest(product))}`:"Retailer pricing unavailable"} · ${escapeHtml(product.category)}</small></div><button class="remove-item" type="button" data-save="${product.id}" aria-label="Remove ${escapeHtml(product.name)}">×</button></article>`).join("") : '<p class="list-empty">Your shopping list is empty. Save a product to keep it here.</p>';
   refreshSaveButtons();
 }
 

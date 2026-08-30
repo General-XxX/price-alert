@@ -49,7 +49,7 @@
   }
 
   function authorizedImage(media) {
-    return validImageUrl(media.primaryImage) && Boolean(media.imageSource) && /(authorized|licensed|permission-granted|owned-asset|public-domain|affiliate-feed|manufacturer-feed|retailer-feed)/i.test(media.imageLicenseOrPermission || "");
+    return Boolean(window.PriceAlertMediaResolver&&window.PriceAlertMediaResolver.isAuthorized(media));
   }
 
   function mediaMarkup() {
@@ -59,19 +59,12 @@
     if (!authorizedImage(media)) {
       return `<div class="product-visual product-page-visual" data-category="${escapeHtml(product.category)}" data-media-kind="placeholder" role="img" aria-label="Product visual for ${escapeHtml(product.brand)} ${escapeHtml(product.name)}"><span class="product-placeholder">${escapeHtml(mark)}</span></div>`;
     }
-    return `<div class="product-visual product-page-visual" data-category="${escapeHtml(product.category)}" data-media-kind="image"><img class="product-image" src="${escapeHtml(media.primaryImage)}" alt="${escapeHtml(alt)}" decoding="async"><span class="product-placeholder" hidden>${escapeHtml(mark)}</span></div>`;
+    const gallery=(media.galleryImages||[]).map((url,index)=>`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(product.name)} gallery image ${index+1}"><img src="${escapeHtml(url)}" alt="${escapeHtml(alt)} — view ${index+2}" loading="lazy" decoding="async" width="80" height="60"></a>`).join("");
+    return `<div><div class="product-visual product-page-visual" data-category="${escapeHtml(product.category)}" data-media-kind="image"><img class="product-image" src="${escapeHtml(media.primaryImage)}" alt="${escapeHtml(alt)}" decoding="async" width="640" height="480"><span class="product-placeholder" hidden>${escapeHtml(mark)}</span></div>${gallery?`<div class="product-gallery" aria-label="Additional product images">${gallery}</div>`:""}</div>`;
   }
 
   function useMediaFallback(image) {
-    const container = image.closest(".product-visual");
-    const placeholder = container && container.querySelector(".product-placeholder");
-    if (!container || !placeholder) return;
-    image.hidden = true;
-    image.removeAttribute("src");
-    placeholder.hidden = false;
-    container.dataset.mediaKind = "placeholder";
-    container.setAttribute("role", "img");
-    container.setAttribute("aria-label", `Product visual for ${product.brand} ${product.name}`);
+    window.PriceAlertMediaResolver.fallbackImageElement(image,`${product.brand} ${product.name}`);
   }
 
   function displayValue(value) {
@@ -123,8 +116,9 @@
     $("#breadcrumb-product").textContent = `${product.brand} ${product.name}`;
     [$("#category-nav-link"),$("#category-breadcrumb-link")].forEach(link=>{ link.textContent=product.category; link.href=`../index.html?category=${encodeURIComponent(product.category)}#results`; });
     $("#product-media").innerHTML = mediaMarkup();
-    $("#lowest-price").textContent = bestOffer ? money(currentPrice(bestOffer), bestOffer.currency) : "Check retailers";
+    $("#lowest-price").textContent = bestOffer ? money(currentPrice(bestOffer), bestOffer.currency) : "Retailer pricing unavailable";
     $("#offer-count").textContent = `${offers.length} retailer option${offers.length === 1 ? "" : "s"}`;
+    if (bestOffer) $("#compare-offers-control").outerHTML='<a class="button button-primary" id="compare-offers-control" href="#retailer-offers">Compare retailer offers</a>';
     if (bestOffer) alertStorage.mountTargetAlert($("#target-price-alert"), { product, currentLowestPrice:currentPrice(bestOffer), currency:bestOffer.currency });
     else $("#target-price-alert").innerHTML = '<p class="list-empty">A Target Price Alert can be set when a priced retailer offer is available.</p>';
     const specificationEntries=Object.entries(product.specifications||{}).filter(([key, value]) => key !== "visualMark" && value !== null && value !== "");
@@ -175,7 +169,7 @@
     window.setTimeout(() => { toast.hidden = true; }, 2200);
   }
 
-  document.addEventListener("error", event => { if (event.target && event.target.matches && event.target.matches(".product-image")) useMediaFallback(event.target); }, true);
+  document.addEventListener("error", event => { if (!event.target||!event.target.matches)return;if(event.target.matches(".product-image"))useMediaFallback(event.target);else if(event.target.matches(".product-gallery img")){const link=event.target.closest("a");if(link)link.hidden=true;} }, true);
   $("#save-product").addEventListener("click", toggleSaved);
   $("#shopping-list-items").addEventListener("click", event => { if (event.target.closest("[data-remove-product]")) toggleSaved(); });
 

@@ -1,0 +1,4 @@
+"use strict";
+const {createRetailerAdapter}=require("./adapter-contract.js");
+function normalizeRecord(record,options={}){const approved=options.sourceApproved===true&&["affiliate-api","affiliate-feed"].includes(options.sourceType);return{...record,name:record.name||record.productname,modelNumber:record.modelNumber||record.sku,upc:record.upc||record.upccode,primaryImage:record.primaryImage||record.imageurl,productUrl:record.productUrl||record.linkurl,imageSourceType:approved?options.sourceType:"unverified",imageSource:approved?(options.sourceId||"rakuten-approved-source"):null,sourceApproved:approved,imageLicenseOrPermission:approved?"authorized-affiliate-source":null,offers:record.offers||[]};}
+module.exports=createRetailerAdapter({adapterId:"rakuten",retailerId:"rakuten-advertiser",displayName:"Rakuten approved advertiser",requiredEnvironment:["RAKUTEN_FEED_CREDENTIAL"],normalizeRecord});

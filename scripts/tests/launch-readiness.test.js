@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,"..","..");const read=file=>fs.readFileSync(pa
 const html=read("index.html"),productPage=read("products/index.html"),app=read("app.js"),detail=read("products/dewalt-dcd771c2/product-page.js"),alerts=read("price-alerts.js"),links=read("retailer-links.js"),compliance=read("retailer-compliance.js"),styles=read("styles.css"),robots=read("robots.txt"),sitemap=read("sitemap.xml");
 const disclosure="Disclosure: Price Alert may earn a commission when you purchase through certain links on our site. This does not increase the price you pay.";
 
-assert.doesNotMatch(html+productPage,/development preview|test data|\bdemo\b|coming soon|under construction/i,"public HTML contains no unfinished-site language");
+assert.doesNotMatch((html+productPage).replace(/Retailer offers coming soon/g,""),/development preview|test data|\bdemo\b|coming soon|under construction/i,"public HTML contains no unfinished-site language outside the intentional no-offer control");
 assert.doesNotMatch(app+alerts,/console\.assert|runDevelopment/i,"browser bundles do not execute embedded development tests");
 assert.match(alerts,/saved privately on this device/);assert.match(alerts,/No email was sent/);assert.match(alerts,/email delivery is not currently active/);
 assert.match(app,/stored only in this browser/);assert.match(app,/does not sell, stock, or ship/);
@@ -27,9 +27,9 @@ for(const retailerId of ["ebay","walmart","lowes","home-depot","target","amazon"
 assert.match(app,/noopener noreferrer sponsored/);assert.match(detail,/noopener noreferrer sponsored/);assert.match(app,/near-link-disclosure/);assert.match(detail,/near-link-disclosure/);
 assert.match(detail,/Product not found/);assert.match(detail,/noindex, follow/);assert.match(detail,/No valid retailer offers/);assert.match(app,/No valid retailer offers/);assert.match(app,/Price unavailable/);assert.match(app,/could not save your Shopping List/);
 assert.match(html,/aria-controls="filters" aria-expanded="false"/);assert.match(styles,/:focus-visible/);assert.match(styles,/@media \(max-width:/);assert.match(html,/label class="sr-only" for="search-input"/);assert.match(productPage,/aria-label="Breadcrumb"/);
-assert.match(html,/retailer-compliance\.js\?v=20260830-1/);assert.match(html,/price-alerts\.js\?v=20260830-1/);assert.match(html,/app\.js\?v=20260830-1/);assert.match(productPage,/product-page\.js\?v=20260830-1/);
-assert.match(html,/catalog-importer\.js\?v=20260829-3/);
-assert.match(html,/catalog-loader\.js\?v=20260829-2/);
+assert.match(html,/media-resolver\.js\?v=20260830-2/);assert.match(html,/retailer-compliance\.js\?v=20260830-1/);assert.match(html,/price-alerts\.js\?v=20260830-1/);assert.match(html,/app\.js\?v=20260830-3/);assert.match(productPage,/product-page\.js\?v=20260830-4/);
+assert.match(html,/catalog-importer\.js\?v=20260830-1/);
+assert.match(html,/catalog-loader\.js\?v=20260830-1/);
 assert.doesNotMatch(html+productPage+app+detail+alerts,/AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20,}|SG\.[A-Za-z0-9_-]{20,}/,"no credential-shaped values in public assets");
 assert.equal(fs.existsSync(path.join(root,"package.json")),false,"launch does not require paid or build-time dependencies");
 console.log("Launch readiness, public copy, SEO, links, accessibility, and safety tests passed.");

@@ -39,6 +39,9 @@ a { color: inherit; }
 .affiliate-disclosure-banner p { margin: 0; font-size: 1rem; line-height: 1.5; }
 .affiliate-disclosure-banner strong { color: #063b70; }
 .near-link-disclosure { margin: 0; max-width: 18rem; color: #084886; font-size: .875rem; line-height: 1.4; font-weight: 700; }
+.product-gallery { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.product-gallery a { display: block; width: 72px; height: 56px; border: 1px solid var(--gray-200); border-radius: 8px; overflow: hidden; background: white; }
+.product-gallery img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .header-inner { min-height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .logo { text-decoration: none; font-size: 1.55rem; font-weight: 900; letter-spacing: -.04em; white-space: nowrap; }
 .logo span { color: var(--blue); }

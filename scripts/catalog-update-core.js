@@ -1,4 +1,5 @@
 "use strict";
+const mediaResolver=require("../media-resolver.js");
 
 const VARIANT_FIELDS = ["toolOnly", "storage", "screenSize", "memory", "packageQuantity", "bundleContents", "configuration", "capacity", "size", "platform", "edition"];
 const present = value => value !== null && value !== undefined && value !== "" && (!Array.isArray(value) || value.length > 0);
@@ -116,6 +117,7 @@ function mergeProduct(existing, incoming) {
   merged.familyId = existing.familyId;
   merged.offers = mergeOffers(existing.offers, incoming.offers);
   merged.priceHistory = mergeHistory(existing.priceHistory, incoming.priceHistory);
+  merged.media = mediaResolver.selectPreferred([existing.media,incoming.media]) || existing.media || incoming.media;
   return merged;
 }
 

@@ -2,7 +2,7 @@
 const retailerCompliance = require("../retailer-compliance.js");
 
 const BLOCKED_MARKERS = /\b(sample|development|fixture|test|demo|unverified)\b/i;
-const APPROVED_IMAGE_PERMISSION = /(authorized|licensed|permission-granted|owned-asset|public-domain|affiliate-feed|manufacturer-feed|retailer-feed)/i;
+const mediaResolver = require("../media-resolver.js");
 const normalize = value => value === null || value === undefined ? "" : String(value).trim();
 const httpUrl = value => {
   if (!normalize(value)) return true;
@@ -47,7 +47,7 @@ function validateProduct(product, metadata, index, enforceSourceAuthorization = 
   const imageUrls = [media.primaryImage, media.thumbnail, ...(Array.isArray(media.galleryImages) ? media.galleryImages : [])].filter(value => normalize(value));
   if (imageUrls.length) {
     if (imageUrls.some(value => !httpUrl(value))) errors.push(`${prefix}: image URLs must use HTTP or HTTPS.`);
-    if (!APPROVED_IMAGE_PERMISSION.test(media.imageLicenseOrPermission || "") || !normalize(media.imageSource)) errors.push(`${prefix}: image URL lacks authorized permission/source metadata.`);
+    if (!mediaResolver.isAuthorized(media) || !normalize(media.imageSource)) errors.push(`${prefix}: image URL lacks authorized permission/source metadata.`);
   }
   (product.offers || []).forEach((offer, offerIndex) => {
     const offerPrefix = `${prefix}, offer ${offer.offerId || offerIndex + 1}`;

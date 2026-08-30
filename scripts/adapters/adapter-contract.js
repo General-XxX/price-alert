@@ -1,6 +1,6 @@
 "use strict";
 
-function createRetailerAdapter({ adapterId, retailerId, displayName, requiredEnvironment = [] }) {
+function createRetailerAdapter({ adapterId, retailerId, displayName, requiredEnvironment = [], normalizeRecord = record => record }) {
   if (!adapterId || !retailerId || !displayName) throw new Error("Retailer adapters require adapterId, retailerId, and displayName.");
   return Object.freeze({
     adapterId, retailerId, displayName, requiredEnvironment:Object.freeze([...requiredEnvironment]),
@@ -9,7 +9,7 @@ function createRetailerAdapter({ adapterId, retailerId, displayName, requiredEnv
       throw new Error(`${displayName} feed/API access is not configured. Use only an approved server-side feed implementation.`);
     },
     normalize(records, importer, options = {}) {
-      const products=(Array.isArray(records)?records:[]).map(record=>({ ...record, offers:(record.offers||[]).map(offer=>({ ...offer, retailerId, retailerName:offer.retailerName||displayName })) }));
+      const products=(Array.isArray(records)?records:[]).map(record=>normalizeRecord(record,options)).map(record=>({ ...record, offers:(record.offers||[]).map(offer=>({ ...offer, retailerId, retailerName:offer.retailerName||displayName })) }));
       return importer.importBatch(products, options);
     }
   });

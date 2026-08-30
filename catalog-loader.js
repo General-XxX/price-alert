@@ -3,7 +3,6 @@
 
   const fallbackCatalog = window.PriceAlertData;
   const blockedStatus = /sample|development|fixture|test|demo|unverified/i;
-  const approvedImagePermission = /(authorized|licensed|permission-granted|owned-asset|public-domain|affiliate-feed|manufacturer-feed|retailer-feed)/i;
 
   function httpUrl(value) {
     if (!value) return true;
@@ -15,7 +14,7 @@
     if (!product || !product.id || !product.slug || product.dataStatus !== "production-approved" || blockedStatus.test(JSON.stringify(product.sourceMetadata || {})) || hasPrivateFields(product)) return false;
     const media = product.media || {};
     const images = [media.primaryImage, media.thumbnail, ...(Array.isArray(media.galleryImages) ? media.galleryImages : [])].filter(Boolean);
-    if (images.length && (images.some(image => !httpUrl(image)) || !media.imageSource || !approvedImagePermission.test(media.imageLicenseOrPermission || ""))) return false;
+    if (images.length && (images.some(image => !httpUrl(image)) || !window.PriceAlertMediaResolver || !window.PriceAlertMediaResolver.isAuthorized(media))) return false;
     return (product.offers || []).every(offer => !offer.productUrl || httpUrl(offer.productUrl)) && (product.offers || []).every(offer => !offer.affiliateUrl || httpUrl(offer.affiliateUrl));
   }
 

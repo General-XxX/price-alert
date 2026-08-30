@@ -24,7 +24,7 @@ const adapters = require(path.join(root,"scripts","adapters","adapter-registry.j
   assert.equal(updater.compareVariantCompatibility(base,conflict).compatible,false,"variant conflicts are rejected");
 
   const adapterList=adapters.list();
-  ["generic-file","generic-json","generic-csv","ebay","walmart","lowes","home-depot","target","amazon"].forEach(id=>assert.ok(adapterList.some(adapter=>adapter.adapterId===id),`${id} adapter is registered`));
+  ["generic-file","generic-json","generic-csv","rakuten","ebay","walmart","lowes","home-depot","target","amazon","best-buy","newegg","b-and-h","tractor-supply"].forEach(id=>assert.ok(adapterList.some(adapter=>adapter.adapterId===id),`${id} adapter is registered`));
   assert.equal(adapters.get("ebay").configured({}),false,"credentialed adapters stay disabled without environment credentials");
 
   const fallback={ products:[{id:"fallback",slug:"fallback",dataStatus:"sample-development",offers:[]}],categories:[],retailers:[] };

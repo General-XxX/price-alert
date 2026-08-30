@@ -1,5 +1,7 @@
 (function () {
   "use strict";
+  const mediaResolver=typeof window!=="undefined"?window.PriceAlertMediaResolver:require("./media-resolver.js");
+  if(!mediaResolver)throw new Error("Price Alert media resolver failed to load.");
 
   const RETAILER_IDS = Object.freeze({ "lowe's":"lowes", "lowes":"lowes", "home depot":"home-depot", "walmart":"walmart", "best buy":"best-buy", "ebay":"ebay", "amazon":"amazon", "target":"target" });
   const text = value => value === null || value === undefined || String(value).trim() === "" ? null : String(value).trim();
@@ -28,26 +30,7 @@
   }
 
   function normalizeMedia(record) {
-    const incoming = structured(record.media || record.mediaJson, {}) || {};
-    const permission = text(incoming.imageLicenseOrPermission || record.imageLicenseOrPermission);
-    const candidate = httpUrl(incoming.primaryImage || record.primaryImage || record.imageUrl || record.image);
-    const imageSource = text(incoming.imageSource || record.imageSource);
-    const permissionAllowsUse = Boolean(imageSource && permission && /(authorized|licensed|permission-granted|owned-asset|public-domain|affiliate-feed|manufacturer-feed|retailer-feed)/i.test(permission));
-    const primaryImage = candidate && permissionAllowsUse ? candidate : null;
-    const galleryCandidates = structured(incoming.galleryImages || record.galleryImages, []);
-    const galleryImages = permissionAllowsUse && Array.isArray(galleryCandidates) ? galleryCandidates.map(httpUrl).filter(Boolean) : [];
-    return {
-      primaryImage,
-      galleryImages,
-      thumbnail: permissionAllowsUse ? httpUrl(incoming.thumbnail || record.thumbnail) : null,
-      imageAlt: text(incoming.imageAlt || record.imageAlt),
-      imageSource,
-      imageSourceType: text(incoming.imageSourceType || record.imageSourceType) || (primaryImage ? "authorized-import" : "placeholder"),
-      imageLicenseOrPermission: permission,
-      imageLastUpdated: text(incoming.imageLastUpdated || record.imageLastUpdated),
-      videoUrl: httpUrl(incoming.videoUrl || record.videoUrl),
-      mediaStatus: text(incoming.mediaStatus || record.mediaStatus) || (primaryImage ? "available" : candidate ? "needs-permission-review" : "placeholder")
-    };
+    return mediaResolver.normalizeMedia({...record,media:structured(record.media||record.mediaJson,{})||{}},record.sourceMetadata||{});
   }
 
   function normalizeVariant(variant, index, productId) {
