@@ -10,13 +10,13 @@ const { publishAtomically } = require("../catalog-publisher.js");
 const approvedMetadata = {
   environment:"production", approvalStatus:"approved", publicationAuthorized:true,
   sourceId:"approved-feed-source", approvedAt:"2026-08-29T00:00:00.000Z",
-  approvedRetailerIds:["approved-retailer"], affiliateAuthorization:false
+  approvedRetailerIds:["ebay"], affiliateAuthorization:false
 };
 const product = {
   id:"approved-product", name:"Approved Product", brand:"Known Brand", modelNumber:"MODEL-1",
   identity:{ brand:"Known Brand", manufacturer:"Known Brand", modelNumber:"MODEL-1", mpn:"MODEL-1", upc:"", gtin:"" },
   variants:[{ variantId:"approved-product-default", isDefaultVariant:true }],
-  offers:[{ offerId:"approved-offer", retailerId:"approved-retailer", retailerName:"Approved Retailer", variantId:"approved-product-default", price:10, regularPrice:12, currency:"USD", productUrl:"https://retailer.invalid/product", affiliateUrl:"" }],
+  offers:[{ offerId:"approved-offer", retailerId:"ebay", retailerName:"eBay", variantId:"approved-product-default", price:10, regularPrice:12, currency:"USD", productUrl:"https://retailer.invalid/product", affiliateUrl:"" }],
   media:{ primaryImage:"", imageSource:"", imageLicenseOrPermission:"" }, dataStatus:"production-approved"
 };
 const cleanReport = { conflicts:0, skipped:0, errors:0 };

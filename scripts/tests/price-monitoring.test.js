@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,"..","..");const {fetchSafely}=require("../mon
 const offers=require("../monitoring/offer-evaluator.js");const history=require("../monitoring/price-history.js");const {detect}=require("../monitoring/deal-detector.js");const {MemoryAlertStore,normalizeEmail}=require("../monitoring/alert-store.js");const destinations=require("../monitoring/destination-resolver.js");const {render}=require("../monitoring/email-template.js");const {MockEmailProvider,productionProvider}=require("../monitoring/email-provider.js");const {checkAlert}=require("../monitoring/alert-engine.js");
 const variants=[{variantId:"kit",variantName:"Kit",modelNumber:"M-1",isDefaultVariant:true},{variantId:"tool",variantName:"Tool only",modelNumber:"M-1B"}];
 const product={id:"p1",slug:"p1",brand:"Brand",name:"Product",modelNumber:"M-1",variants,offers:[
-  {offerId:"a",retailerId:"amazon",retailerName:"Amazon",variantId:"kit",price:90,regularPrice:120,currency:"USD",availability:"In Stock",stockStatus:"in-stock",affiliateUrl:"https://amazon.invalid/affiliate",productUrl:"https://amazon.invalid/product",dataStatus:"production-approved"},
+  {offerId:"a",retailerId:"ebay",retailerName:"eBay",variantId:"kit",price:80,regularPrice:120,currency:"USD",availability:"In Stock",stockStatus:"in-stock",affiliateUrl:"https://ebay.invalid/affiliate",affiliateTrackingStatus:"approved-production",productUrl:"https://ebay.invalid/product",dataStatus:"production-approved"},
   {offerId:"w",retailerId:"walmart",retailerName:"Walmart",variantId:"kit",price:80,currency:"USD",availability:"In Stock",stockStatus:"in-stock",productUrl:"https://walmart.invalid/product",dataStatus:"production-approved"},
   {offerId:"out",retailerId:"ebay",retailerName:"eBay",variantId:"kit",price:60,currency:"USD",availability:"Out of Stock",stockStatus:"out-of-stock",dataStatus:"production-approved"},
   {offerId:"wrong",retailerId:"lowes",retailerName:"Lowe's",variantId:"tool",price:50,currency:"USD",availability:"In Stock",dataStatus:"production-approved"},
@@ -13,14 +13,14 @@ const product={id:"p1",slug:"p1",brand:"Brand",name:"Product",modelNumber:"M-1",
 ]};
 
 (async()=>{
-  assert.equal(offers.currentLowest(product,{variantId:"kit",currency:"USD",mode:"development"}).offerId,"w","lowest compatible retailer wins");
+  assert.equal(offers.currentLowest(product,{variantId:"kit",currency:"USD",mode:"development"}).offerId,"a","lowest compatible retailer wins deterministically");
   assert.equal(offers.currentLowest(product,{variantId:"kit",mode:"development"}),null,"currencies are never mixed implicitly");
   assert.equal(offers.validOffer(product,product.offers[2],{variantId:"kit"}),false,"unavailable offer ignored");
   assert.equal(offers.validOffer(product,product.offers[3],{variantId:"kit"}),false,"incompatible variant ignored");
   assert.equal(offers.validOffer(product,product.offers[4],{variantId:"kit"}),false,"malformed price ignored");
   assert.equal(offers.price(null),null,"missing price is not zero");
 
-  const observed=offers.observation(product,product.offers[1],{timestamp:"2026-01-01T00:00:00Z"});let rows=[];
+  const observed=offers.observation(product,product.offers[0],{timestamp:"2026-01-01T00:00:00Z"});let rows=[];
   let result=history.append(rows,observed);rows=result.history;assert.equal(result.added,true,"history observation created");
   result=history.append(rows,{...observed,timestamp:"2026-01-02T00:00:00Z"});assert.equal(result.added,false,"identical history deduplicated");
   result=history.append(rows,{...observed,price:75,timestamp:"2026-01-03T00:00:00Z"});rows=result.history;assert.equal(rows.length,2,"changed price preserved");
@@ -37,13 +37,14 @@ const product={id:"p1",slug:"p1",brand:"Brand",name:"Product",modelNumber:"M-1",
   assert.equal(first.created,true);assert.equal(second.created,false,"duplicate alert updates instead of multiplying");assert.equal(store.listActive().length,1);assert.equal(store.listActive()[0].targetPrice,75);
 
   assert.equal(destinations.resolve(product.offers[0],product).type,"affiliate");assert.equal(destinations.resolve({...product.offers[0],affiliateUrl:""},product).type,"product");assert.equal(destinations.resolve({...product.offers[0],affiliateUrl:"",productUrl:""},product).type,"retailer-search");
-  assert.equal(destinations.resolve(product.offers[0],product,{mode:"production"}).type,"product","unapproved affiliate tracking is ignored in production");
-  const content=render({product,variant:variants[0],alert:{targetPrice:85,currency:"USD"},offer:{...product.offers[1],currentPrice:80},destination:destinations.resolve(product.offers[1],product),savings:null});assert.match(content.html,/PRICE ALERT/);assert.match(content.html,/View Deal/);assert.match(content.html,/commission/);assert.doesNotMatch(content.html,/shopper@example\.com/);
+  assert.equal(destinations.resolve(product.offers[0],product,{context:"email"}).type,"product","affiliate email promotion is disabled without written approval");
+  assert.equal(destinations.resolve({...product.offers[0],retailerId:"amazon",retailerName:"Amazon"},product).type,"product","hold retailer cannot use affiliate URL");
+  const content=render({product,variant:variants[0],alert:{targetPrice:85,currency:"USD"},offer:{...product.offers[1],currentPrice:80},destination:destinations.resolve(product.offers[1],product),savings:null});assert.match(content.html,/PRICE ALERT/);assert.match(content.html,/View Deal/);assert.match(content.html,/Disclosure:<\/strong> Price Alert may earn a commission when you purchase through certain links on our site\. This does not increase the price you pay\./);assert.match(content.text,/\nDisclosure: Price Alert may earn a commission when you purchase through certain links on our site\. This does not increase the price you pay\./);assert.doesNotMatch(content.html,/shopper@example\.com/);
   const provider=new MockEmailProvider();const triggerStore=new MemoryAlertStore([{alertId:"trigger",productId:"p1",variantId:"kit",email:"private@example.com",targetPrice:80,currency:"USD",dataStatus:"development-local"}]);
-  const triggered=await checkAlert({alert:triggerStore.listActive()[0],product,store:triggerStore,emailProvider:provider,mode:"development"});assert.equal(triggered.status,"mocked-not-sent");assert.equal(triggered.retailerId,"walmart","winning retailer retained");assert.equal(provider.deliveries.length,1);
+  const triggered=await checkAlert({alert:triggerStore.listActive()[0],product,store:triggerStore,emailProvider:provider,mode:"development"});assert.equal(triggered.status,"mocked-not-sent");assert.equal(triggered.retailerId,"ebay","only an alert-permitted retailer can win");assert.equal(provider.deliveries.length,1);
   const repeated=await checkAlert({alert:triggerStore.listActive()[0],product,store:triggerStore,emailProvider:provider,mode:"development"});assert.equal(repeated.status,"already-notified","unchanged qualifying price does not spam");assert.equal(provider.deliveries.length,1);
-  const productionBlocked=await checkAlert({alert:{...triggerStore.listActive()[0],dataStatus:"sample-development"},product,store:triggerStore,emailProvider:provider,mode:"production",approvedRetailerIds:["walmart"]});assert.equal(productionBlocked.status,"blocked-non-production-alert");assert.throws(()=>productionProvider(),/disabled/);
-  const productBlocked=await checkAlert({alert:{...triggerStore.listActive()[0],dataStatus:"production-approved"},product:{...product,dataStatus:"sample-development"},store:triggerStore,emailProvider:provider,mode:"production",approvedRetailerIds:["walmart"]});assert.equal(productBlocked.status,"blocked-non-production-product");
+  const productionBlocked=await checkAlert({alert:{...triggerStore.listActive()[0],dataStatus:"sample-development"},product,store:triggerStore,emailProvider:provider,mode:"production",approvedRetailerIds:["ebay"]});assert.equal(productionBlocked.status,"blocked-non-production-alert");assert.throws(()=>productionProvider(),/disabled/);
+  const productBlocked=await checkAlert({alert:{...triggerStore.listActive()[0],dataStatus:"production-approved"},product:{...product,dataStatus:"sample-development"},store:triggerStore,emailProvider:provider,mode:"production",approvedRetailerIds:["ebay"]});assert.equal(productBlocked.status,"blocked-non-production-product");
   const redacted=redact({email:"private@example.com",message:"Contact private@example.com",apiKey:"do-not-print"});assert.equal(redacted.email,"[redacted]");assert.doesNotMatch(JSON.stringify(redacted),/private@example\.com|do-not-print/);
 
   const alertUi=fs.readFileSync(path.join(root,"price-alerts.js"),"utf8"),app=fs.readFileSync(path.join(root,"app.js"),"utf8"),page=fs.readFileSync(path.join(root,"products","index.html"),"utf8"),css=fs.readFileSync(path.join(root,"styles.css"),"utf8");

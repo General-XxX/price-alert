@@ -17,6 +17,7 @@
   }
   const escapeHtml = value => String(value).replace(/[&<>'"]/g, character => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" })[character]);
   const money = (value, currency = "USD") => new Intl.NumberFormat("en-US", { style:"currency", currency }).format(value);
+  const destinationMarkup = destination => destination ? `${destination.requiresNearLinkDisclosure?'<p class="near-link-disclosure">Price Alert may earn a commission from this retailer.</p>':""}<a class="button button-primary" href="${escapeHtml(destination.url)}" target="_blank" rel="${destination.sponsored?'noopener noreferrer sponsored':'noopener noreferrer'}" data-retailer-link="${destination.linkType}">${escapeHtml(destination.label)}</a>` : "";
 
   function validPrice(value) {
     if (value === null || value === undefined || value === "") return null;
@@ -134,10 +135,10 @@
     $("#offer-list").innerHTML = offers.length?offers.map((offer, index) => {
       const destination = linkHelpers.resolveOfferDestination(offer, product);
       const savings = validPrice(offer.regularPrice) > currentPrice(offer) ? validPrice(offer.regularPrice) - currentPrice(offer) : 0;
-      return `<article class="offer-card${index === 0 ? " best" : ""}"><div><span class="retailer-name">${escapeHtml(offer.retailerName)}</span>${index === 0 ? '<span class="best-badge">Lowest Price</span>' : ""}</div><div><div>${escapeHtml(offer.availability)}</div><div class="offer-detail">${escapeHtml(offer.shipping || "Shipping details vary")}${savings > 0 ? ` · Save ${money(savings, offer.currency)}` : ""}</div></div><div class="offer-price">${money(currentPrice(offer), offer.currency)}</div>${destination ? `<a class="button button-primary" href="${escapeHtml(destination.url)}" target="_blank" rel="noopener noreferrer sponsored" data-retailer-link="${destination.linkType}">${escapeHtml(destination.label)}</a>` : ""}</article>`;
+      return `<article class="offer-card${index === 0 ? " best" : ""}"><div><span class="retailer-name">${escapeHtml(offer.retailerName)}</span>${index === 0 ? '<span class="best-badge">Lowest Price</span>' : ""}</div><div><div>${escapeHtml(offer.availability)}</div><div class="offer-detail">${escapeHtml(offer.shipping || "Shipping details vary")}${savings > 0 ? ` · Save ${money(savings, offer.currency)}` : ""}</div></div><div class="offer-price">${money(currentPrice(offer), offer.currency)}</div>${destinationMarkup(destination)}</article>`;
     }).join(""):'<p class="section-empty">No valid retailer offers are available right now. Check again after retailer information is refreshed.</p>';
 
-    const history=Array.isArray(product.priceHistory)?product.priceHistory.filter(entry=>validPrice(entry.price)!==null):[];
+    const history=Array.isArray(product.priceHistory)?product.priceHistory.filter(entry=>window.PriceAlertRetailerCompliance.allows(entry.retailerId,"allowPriceHistory")&&validPrice(entry.price)!==null):[];
     if (!history.length) { $("#history-chart").innerHTML='<p class="list-empty">No recorded price history is available yet.</p>'; return; }
     const prices = history.map(entry => entry.price);
     const minimum = Math.min(...prices);

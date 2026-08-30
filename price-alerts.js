@@ -21,11 +21,12 @@
     }
   }
 
-  function createAlertRecord({ productId, variantId = null, targetPrice, email, currency, currentLowestPrice }) {
+  function createAlertRecord({ productId, variantId = null, targetPrice, email, currency, currentLowestPrice, eligibleRetailerIds = [] }) {
     const target = validMoney(targetPrice);
     const current = validMoney(currentLowestPrice);
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
     if (!productId) return { ok:false, error:"A product is required." };
+    if (!Array.isArray(eligibleRetailerIds) || !eligibleRetailerIds.length) return { ok:false, error:"A price alert is not available for this product right now." };
     if (!validEmail(normalizedEmail)) return { ok:false, error:"Enter a valid email address." };
     if (target === null || current === null || target >= current) return { ok:false, error:"Choose a target price below the current lowest price." };
     const createdAt = new Date().toISOString();
@@ -37,6 +38,7 @@
       email: normalizedEmail,
       currency: currency || "USD",
       currentLowestPrice: current,
+      eligibleRetailerIds:[...new Set(eligibleRetailerIds.filter(Boolean))],
       createdAt,
       updatedAt: createdAt,
       active: true,
@@ -88,7 +90,11 @@
   }
 
   function renderTargetAlert(product, currentLowestPrice, currency = "USD") {
-    const current = validMoney(currentLowestPrice);
+    const compliance=window.PriceAlertRetailerCompliance;
+    const eligibleOffers=compliance?compliance.eligibleOffers(product,"allowPriceAlerts").filter(offer=>validMoney(offer.salePrice??offer.price)!==null&&(!currency||offer.currency===currency)&&!/out of stock|unavailable/i.test(offer.availability||"")):[];
+    const eligiblePrices=eligibleOffers.map(offer=>validMoney(offer.salePrice??offer.price)).filter(value=>value!==null);
+    const current = eligiblePrices.length?Math.min(...eligiblePrices):null;
+    if (product && current === null) return '<section class="target-alert target-alert-unavailable" aria-label="Target Price Alert"><h3>Target Price Alert</h3><p>Price alerts are not available for this product right now.</p></section>';
     if (!product || current === null) return "";
     const variants = Array.isArray(product.variants) ? product.variants : [];
     const variant = variants.find(item => item.isDefaultVariant) || variants[0] || null;
@@ -96,14 +102,15 @@
     const maximum = Math.max(minimum, Number((current - .01).toFixed(2)));
     const selected = Math.min(maximum, Math.max(minimum, targetPriceValue(current)));
     const titleId = `target-alert-title-${String(product.id).replace(/[^a-z0-9_-]/gi, "-")}`;
-    return `<section class="target-alert" data-product-alert data-product-id="${escapeHtml(product.id)}" data-variant-id="${escapeHtml(variant ? variant.variantId : "")}" data-current-price="${current}" data-currency="${escapeHtml(currency)}" aria-labelledby="${titleId}">
+    const eligibleRetailerIds=[...new Set(eligibleOffers.map(offer=>offer.retailerId).filter(Boolean))];
+    return `<section class="target-alert" data-product-alert data-product-id="${escapeHtml(product.id)}" data-variant-id="${escapeHtml(variant ? variant.variantId : "")}" data-current-price="${current}" data-currency="${escapeHtml(currency)}" data-eligible-retailers="${escapeHtml(eligibleRetailerIds.join(","))}" aria-labelledby="${titleId}">
       <div class="target-alert-price"><span>Current lowest available price</span><strong>${money(current,currency)}</strong></div>
       <h3 id="${titleId}">Target Price Alert</h3>
       <p class="target-prompt">Alert me when the price drops to:</p>
       <div class="target-value" aria-live="polite"><output data-target-output>${money(selected,currency)}</output></div>
       <input class="target-slider" data-target-slider type="range" min="${minimum}" max="${maximum}" step="0.01" value="${selected}" aria-label="Target price">
       <div class="target-quick-actions" aria-label="Quick target prices"><button type="button" data-target-percent="5">5% lower</button><button type="button" data-target-percent="10" class="active">10% lower</button><button type="button" data-target-percent="20">20% lower</button></div>
-      <p class="target-explanation">This target applies across all matched retailers. It is saved privately in this browser; email delivery is not currently active.</p>
+      <p class="target-explanation">This target applies across matched retailers that are eligible for price alerts. It is saved privately in this browser; email delivery is not currently active.</p>
       <form class="target-alert-form" data-target-alert-form novalidate><label><span>Email address</span><input type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label><button class="button button-primary" type="submit">Set Price Alert</button></form>
       <p class="target-alert-message" data-target-message role="status" hidden></p>
     </section>`;
@@ -120,7 +127,7 @@
     const quickButtons = [...alert.querySelectorAll("[data-target-percent]")];
     slider.addEventListener("input", () => { output.textContent = money(Number(slider.value),currency); quickButtons.forEach(button => button.classList.remove("active")); });
     quickButtons.forEach(button => button.addEventListener("click", () => { slider.value=Math.min(Number(slider.max),Math.max(Number(slider.min),targetPriceValue(Number(alert.dataset.currentPrice),Number(button.dataset.targetPercent)))); output.textContent=money(Number(slider.value),currency); quickButtons.forEach(item=>item.classList.toggle("active",item===button)); }));
-    alert.querySelector("[data-target-alert-form]").addEventListener("submit", event => { event.preventDefault(); const email=event.currentTarget.elements.email; const message=alert.querySelector("[data-target-message]"); const result=saveProductAlert({productId:alert.dataset.productId,variantId:alert.dataset.variantId||null,targetPrice:slider.value,email:email.value,currency,currentLowestPrice:alert.dataset.currentPrice}); message.textContent=result.ok?"Price alert saved privately on this device. No email was sent; email delivery requires a secure notification service.":result.error; message.classList.toggle("error",!result.ok); message.hidden=false; if(!result.ok) email.focus(); });
+    alert.querySelector("[data-target-alert-form]").addEventListener("submit", event => { event.preventDefault(); const email=event.currentTarget.elements.email; const message=alert.querySelector("[data-target-message]"); const result=saveProductAlert({productId:alert.dataset.productId,variantId:alert.dataset.variantId||null,targetPrice:slider.value,email:email.value,currency,currentLowestPrice:alert.dataset.currentPrice,eligibleRetailerIds:(alert.dataset.eligibleRetailers||"").split(",").filter(Boolean)}); message.textContent=result.ok?"Price alert saved privately on this device. No email was sent; email delivery requires a secure notification service.":result.error; message.classList.toggle("error",!result.ok); message.hidden=false; if(!result.ok) email.focus(); });
     return true;
   }
 

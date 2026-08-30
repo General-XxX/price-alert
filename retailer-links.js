@@ -8,7 +8,10 @@
     "best-buy": query => `https://www.bestbuy.com/site/searchpage.jsp?st=${encodeURIComponent(query)}`,
     ebay: query => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`,
     amazon: query => `https://www.amazon.com/s?k=${encodeURIComponent(query)}`,
-    target: query => `https://www.target.com/s?searchTerm=${encodeURIComponent(query)}`
+    target: query => `https://www.target.com/s?searchTerm=${encodeURIComponent(query)}`,
+    newegg: query => `https://www.newegg.com/p/pl?d=${encodeURIComponent(query)}`,
+    "b-and-h": query => `https://www.bhphotovideo.com/c/search?q=${encodeURIComponent(query)}`,
+    "tractor-supply": query => `https://www.tractorsupply.com/tsc/search/${encodeURIComponent(query)}`
   });
 
   function validExternalUrl(value) {
@@ -29,12 +32,13 @@
   }
 
   function resolveOfferDestination(offer, product) {
+    const compliance = window.PriceAlertRetailerCompliance && window.PriceAlertRetailerCompliance.getCompliance(offer);
     const affiliateUrl = validExternalUrl(offer && offer.affiliateUrl);
-    if (affiliateUrl) return { url:affiliateUrl, linkType:"affiliate", label:`View at ${offer.retailerName}` };
+    if (affiliateUrl && compliance && compliance.allowAffiliateLink && offer.affiliateTrackingStatus === "approved-production") return { url:affiliateUrl, linkType:"affiliate", label:`View at ${offer.retailerName}`, sponsored:true, requiresNearLinkDisclosure:compliance.requiresNearLinkDisclosure };
     const productUrl = validExternalUrl(offer && offer.productUrl);
-    if (productUrl) return { url:productUrl, linkType:"product", label:`View at ${offer.retailerName}` };
+    if (productUrl) return { url:productUrl, linkType:"product", label:`View at ${offer.retailerName}`, sponsored:false, requiresNearLinkDisclosure:false };
     const searchUrl = retailerSearchUrl(offer, product);
-    return searchUrl ? { url:searchUrl, linkType:"retailer-search", label:`Search ${offer.retailerName}` } : null;
+    return searchUrl ? { url:searchUrl, linkType:"retailer-search", label:`Search ${offer.retailerName}`, sponsored:false, requiresNearLinkDisclosure:false } : null;
   }
 
   window.PriceAlertRetailerLinks = Object.freeze({

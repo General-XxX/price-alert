@@ -35,6 +35,10 @@ a { color: inherit; }
 .split-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
 
 .site-header { background: rgba(255,255,255,.96); border-bottom: 1px solid var(--gray-200); position: sticky; top: 0; z-index: 40; backdrop-filter: blur(12px); }
+.affiliate-disclosure-banner { padding: 12px 0; background: #e9f3ff; border-bottom: 1px solid #a9c9ee; color: #084886; }
+.affiliate-disclosure-banner p { margin: 0; font-size: 1rem; line-height: 1.5; }
+.affiliate-disclosure-banner strong { color: #063b70; }
+.near-link-disclosure { margin: 0; max-width: 18rem; color: #084886; font-size: .875rem; line-height: 1.4; font-weight: 700; }
 .header-inner { min-height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .logo { text-decoration: none; font-size: 1.55rem; font-weight: 900; letter-spacing: -.04em; white-space: nowrap; }
 .logo span { color: var(--blue); }
@@ -197,8 +201,8 @@ a { color: inherit; }
 .step h3 { margin-bottom: 8px; }
 .step p { color: var(--gray-500); font-size: .92rem; }
 .disclosure { max-width: 900px; margin: auto; padding: 20px 23px; background: var(--blue-soft); border: 1px solid #cfe0f8; border-radius: 12px; }
-.disclosure strong { color: var(--blue); }
-.disclosure p { color: #526078; font-size: .85rem; margin-top: 4px; }
+.disclosure strong { color: #063b70; }
+.disclosure p { color: #084886; font-size: 1rem; margin: 0; }
 
 .site-footer { background: #101a30; color: #dce4f2; padding-top: 58px; }
 .footer-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 50px; }
